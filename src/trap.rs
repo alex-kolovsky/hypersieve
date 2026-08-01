@@ -50,5 +50,5 @@ extern "C" fn trap_handler() -> ! {
         }
     };
 
-    panic!("An exception occurred ({})", scause_str);
+    panic!("A trap occurred ({})", scause_str);
 }
