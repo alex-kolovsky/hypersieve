@@ -1,6 +1,12 @@
 use core::ptr::{read_volatile, write_volatile};
+use lazy_static::lazy_static;
+use spin::Mutex;
 
 pub const QEMU_UART_ADDR: u64 = 0x1000_0000;
+
+lazy_static! {
+    pub static ref UART: Mutex<Uart> = Mutex::new(Uart::new(QEMU_UART_ADDR));
+}
 
 pub struct Uart {
     base_addr: u64,

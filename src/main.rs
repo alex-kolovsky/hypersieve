@@ -22,8 +22,8 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
-    let mut uart = uart::Uart::new(uart::QEMU_UART_ADDR);
-    let _ = uart.write_str("Hello world!");
+    let _ = uart::UART.lock().write_str("Hello world!");
+
     loop {
         unsafe {
             asm!("wfi");
