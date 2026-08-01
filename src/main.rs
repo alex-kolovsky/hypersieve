@@ -5,7 +5,6 @@ mod uart;
 
 use core::{
     arch::{asm, global_asm},
-    fmt::Write,
     panic::PanicInfo,
 };
 
@@ -22,7 +21,7 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
-    let _ = uart::UART.lock().write_str("Hello world!");
+    println!("Hello world!");
 
     loop {
         unsafe {
