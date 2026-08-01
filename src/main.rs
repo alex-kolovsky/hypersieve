@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
 
+mod uart;
+
 use core::{
     arch::{asm, global_asm},
+    fmt::Write,
     panic::PanicInfo,
 };
 
@@ -19,6 +22,8 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
+    let mut uart = uart::Uart::new(uart::QEMU_UART_ADDR);
+    let _ = uart.write_str("Hello world!");
     loop {
         unsafe {
             asm!("wfi");
