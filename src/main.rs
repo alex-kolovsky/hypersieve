@@ -11,7 +11,8 @@ use core::{
 global_asm!(include_str!("asm/boot.S"));
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("panic: {}", info);
     loop {
         unsafe {
             asm!("wfi");
