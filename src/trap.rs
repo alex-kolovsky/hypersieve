@@ -1,14 +1,19 @@
-use core::arch::asm;
-
 const SXLEN: u8 = 64;
+
+macro_rules! read_csr {
+    ($csr_name:expr) => {{
+        let csr_value: u64;
+        unsafe {
+            ::core::arch::asm!(concat!("csrr {}, ", $csr_name), out(reg) csr_value);
+        }
+        csr_value
+    }};
+}
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".stvec")]
 extern "C" fn trap_handler() -> ! {
-    let scause: u64;
-    unsafe {
-        asm!("csrr {}, scause", out(reg) scause);
-    }
+    let scause = read_csr!("scause");
 
     // Extract type of trap (exception/interrupt)
     let interrupt_bit = scause >> (SXLEN - 1);
