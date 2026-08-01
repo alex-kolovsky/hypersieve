@@ -7,6 +7,10 @@
 .global _start
 _start:
 
+        trap_handler_load:
+                la t0, trap_handler
+                csrw stvec, t0
+
         stack_pointer_load:
                 la sp, __stack_end
 
