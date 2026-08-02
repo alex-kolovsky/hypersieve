@@ -9,16 +9,16 @@ SECTIONS {
     *(.text .text.*);
     . = ALIGN(8);
     *(.stvec);
-  }
+  } > HYP_MEM
 
   .rodata : ALIGN(8) {
     *(.rodata .rodata.*);
-  }
+  } > HYP_MEM
 
   .data : ALIGN(8) {
     *(.data .data.*);
     *(.sdata .sdata.*)
-  }
+  } > HYP_MEM
 
   .bss (NOLOAD) : ALIGN(8) {
     __bss_start = .;
@@ -26,19 +26,19 @@ SECTIONS {
     *(.sbss .sbss.*);
     . = ALIGN(8);
     __bss_end = .;
-  }
+  } > HYP_MEM
 
   .stack (NOLOAD) : ALIGN(16) {
     __stack_start = .;
-    . += 1024 * 1024; /* 1 MB */
+    . += 1024 * 1024; /* 1 MiB */
     __stack_end = .;
-  }
+  } > HYP_MEM
 
   .heap (NOLOAD) : ALIGN(16) {
     __heap_start = .;
     . += 64 * 1024 * 1024; /* 64 MiB */
     __heap_end = .;
-  }
+  } > HYP_MEM
 
   /DISCARD/ : {
     *(.eh_frame);
