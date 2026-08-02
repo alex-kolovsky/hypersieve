@@ -33,6 +33,13 @@ SECTIONS {
     . += 1024 * 1024; /* 1 MB */
     __stack_end = .;
   }
+
+  .heap (NOLOAD) : ALIGN(16) {
+    __heap_start = .;
+    . += 64 * 1024 * 1024; /* 64 MiB */
+    __heap_end = .;
+  }
+
   /DISCARD/ : {
     *(.eh_frame);
     *(.eh_frame_hdr);
