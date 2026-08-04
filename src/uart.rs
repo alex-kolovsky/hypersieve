@@ -54,9 +54,6 @@ impl Uart {
             // and unset DLAB to enable receiver and transmitter holding registers
             const UART_WORD_LENGTH_8: u8 = 1 << 0 | 1 << 1;
             write_volatile(uart_ptr.offset(3), UART_WORD_LENGTH_8);
-
-            // Wait until THR gets ready to write
-            while (read_volatile(uart_ptr.offset(5)) & 1 << 5) == 0 {}
         }
     }
 
@@ -64,6 +61,9 @@ impl Uart {
         let uart_ptr = self.base_addr as *mut u8;
 
         unsafe {
+            // Wait until THR gets ready to write
+            while (read_volatile((self.base_addr as *mut u8).offset(5)) & 1 << 5) == 0 {}
+
             write_volatile(uart_ptr.offset(0), byte);
         }
     }
