@@ -1,9 +1,13 @@
 #![no_std]
 #![no_main]
 
+mod allocator;
 mod trap;
 mod uart;
 
+extern crate alloc;
+
+use crate::allocator::BUDDY_ALLOCATOR;
 use core::{
     arch::{asm, global_asm},
     panic::PanicInfo,
@@ -23,6 +27,11 @@ fn panic(info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
+    {
+        let mut heap = BUDDY_ALLOCATOR.heap.lock();
+        heap.init();
+    }
+
     println!("Hello world!");
 
     loop {
