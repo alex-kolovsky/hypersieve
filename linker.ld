@@ -34,9 +34,9 @@ SECTIONS {
     __stack_end = .;
   } > HYP_MEM
 
-  .heap (NOLOAD) : ALIGN(16) {
+  .heap (NOLOAD) : ALIGN(4096) {
     __heap_start = .;
-    . += 64 * 1024 * 1024; /* 64 MiB */
+    . += 1024 * 1024; /* 64 MiB */
     __heap_end = .;
   } > HYP_MEM
 
