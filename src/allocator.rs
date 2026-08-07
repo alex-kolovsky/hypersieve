@@ -44,7 +44,7 @@ impl<const ORDER: usize> Heap<ORDER> {
         let size_of_heap = heap_end - heap_start;
 
         let mut heap_node_index: Option<usize> = None;
-        // Find address for first full-heap block
+        // Find address for first full-heap block.
         for node_index in 0..=self.free_list.len() {
             if (1 << (node_index + 1)) == size_of_heap {
                 heap_node_index = Some(node_index);
@@ -57,7 +57,7 @@ impl<const ORDER: usize> Heap<ORDER> {
     }
 
     pub fn allocate(&mut self, mut size: usize) -> *mut u8 {
-        // Minimal size is 8
+        // Minimal size is 8.
         if size < 8 {
             size = 8;
         }
@@ -166,7 +166,7 @@ fn delete_buddy_from_linked_list(
 ) -> Result<(), ()> {
     loop {
         if linked_list_start.is_null() {
-            // List ended
+            // List ended.
             return Err(());
         } else if linked_list_start as usize == buddy_addr {
             unsafe {

@@ -59,7 +59,7 @@ macro_rules! read_csr {
 extern "C" fn trap_handler() -> ! {
     let scause = read_csr!("scause");
 
-    // Extract type of trap (exception/interrupt)
+    // Extract type of trap (exception/interrupt).
     let interrupt_bit = scause >> (SXLEN - 1);
     let exception_code: u64 = scause & !(1 << 63);
 

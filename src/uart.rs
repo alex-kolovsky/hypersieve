@@ -31,13 +31,13 @@ impl Uart {
     fn init(&self) {
         let uart_ptr = self.base_addr as *mut u8;
         unsafe {
-            // Enable hardware FIFO buffers in FCR
+            // Enable hardware FIFO buffers in FCR.
             write_volatile(uart_ptr.offset(2), 1 << 0);
 
-            // Enable receiver buffer interrupts in IER
+            // Enable receiver buffer interrupts in IER.
             write_volatile(uart_ptr.offset(1), 1 << 1);
 
-            // Set DLAB in LCR to enable access to DLL and DLM registers
+            // Set DLAB in LCR to enable access to DLL and DLM registers.
             write_volatile(uart_ptr.offset(3), 1 << 7);
 
             // Divisor = ( system_clock_speed ) / ( 16 * desired_baud_rate )
@@ -46,12 +46,12 @@ impl Uart {
             let divisor_least: u8 = (divisor & 0xff).try_into().unwrap();
             let divisor_most: u8 = (divisor >> 8).try_into().unwrap();
 
-            // Set DLL and DLM
+            // Set DLL and DLM.
             write_volatile(uart_ptr.offset(0), divisor_least);
             write_volatile(uart_ptr.offset(1), divisor_most);
 
-            // Set UART word length as 8 bits in LCR
-            // and unset DLAB to enable receiver and transmitter holding registers
+            // Set UART word length as 8 bits in LCR.
+            // and unset DLAB to enable receiver and transmitter holding registers.
             const UART_WORD_LENGTH_8: u8 = 1 << 0 | 1 << 1;
             write_volatile(uart_ptr.offset(3), UART_WORD_LENGTH_8);
         }
@@ -61,7 +61,7 @@ impl Uart {
         let uart_ptr = self.base_addr as *mut u8;
 
         unsafe {
-            // Wait until THR gets ready to write
+            // Wait until THR gets ready to write.
             while (read_volatile((self.base_addr as *mut u8).offset(5)) & 1 << 5) == 0 {}
 
             write_volatile(uart_ptr.offset(0), byte);
