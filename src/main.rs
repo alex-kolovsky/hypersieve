@@ -2,6 +2,7 @@
 #![no_main]
 
 mod allocator;
+mod guest_table;
 mod trap;
 mod uart;
 
