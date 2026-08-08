@@ -5,6 +5,7 @@ mod allocator;
 mod guest_table;
 mod trap;
 mod uart;
+mod vcpu;
 
 extern crate alloc;
 
