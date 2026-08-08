@@ -1,10 +1,11 @@
+use crate::{allocator::alloc_pages, guest_table::GuestPageTable};
+use core::{arch::asm, default::Default};
+
 #[derive(Debug, Default)]
 pub struct Vcpu {
-    pub hstatus: u64,
-    pub hgatp: u64,
-    pub sstatus: u64,
-    pub sepc: u64,
+    // Host registers
     pub host_sp: u64,
+    // General purpose registers
     pub ra: u64,
     pub sp: u64,
     pub gp: u64,
@@ -36,4 +37,50 @@ pub struct Vcpu {
     pub t4: u64,
     pub t5: u64,
     pub t6: u64,
+
+    // CSRs
+    pub hstatus: u64,
+    pub hgatp: u64,
+    pub sstatus: u64,
+    pub sepc: u64,
+    pub scause: u64,
+}
+impl Vcpu {
+    pub fn new(table: &GuestPageTable, guest_entry: u64) -> Self {
+        let mut hstatus: u64 = 0;
+        hstatus |= 2 << 32; // set VSXL to 64 bits
+        hstatus |= 1 << 7; // set
+
+        let sstatus: u64 = 1 << 8; // SPP: Supervisor Previous Privilege mode (VS-mode)
+
+        let stack_size = 512 * 1024;
+        let host_sp: u64 = alloc_pages(stack_size) as u64 + stack_size as u64;
+
+        Self {
+            hstatus,
+            hgatp: table.hgatp(),
+            sstatus,
+            sepc: guest_entry,
+            host_sp,
+            ..Default::default()
+        }
+    }
+    pub fn run(&mut self) -> ! {
+        unsafe {
+            asm!(
+                "csrw hstatus, {hstatus}",
+                "csrw sstatus, {sstatus}",
+                "csrw sscratch, {sscratch}",
+                "csrw hgatp, {hgatp}",
+                "csrw sepc, {sepc}",
+                "sret",
+                hstatus = in(reg) self.hstatus,
+                sstatus = in(reg) self.sstatus,
+                hgatp = in(reg) self.hgatp,
+                sepc = in(reg) self.sepc,
+                sscratch = in(reg) (self as *mut Vcpu as usize),
+            );
+        }
+        unreachable!();
+    }
 }
