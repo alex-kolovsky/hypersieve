@@ -7,7 +7,7 @@ unsafe extern "C" {
 }
 extern crate alloc;
 
-pub const HEAP_MAX_CAPACITY: usize = 21; // max capacity = 2^(HEAP_MAX_CAPACITY)
+pub const HEAP_MAX_CAPACITY: usize = 30; // max capacity = 2^(HEAP_MAX_CAPACITY)
 
 unsafe impl<const ORDER: usize> Send for BuddyAllocator<ORDER> {}
 unsafe impl<const ORDER: usize> Sync for BuddyAllocator<ORDER> {}
@@ -51,9 +51,9 @@ impl<const ORDER: usize> Heap<ORDER> {
                 break;
             }
         }
-        self.free_list[heap_node_index.expect(
-            "Heap must be a power of 2 {}\nsizeof: {}\nst: {heap_start}\nnd: {heap_end}",
-        )] = heap_start as *mut u8;
+        self.free_list[heap_node_index
+            .expect("Heap size must be a power of two or less than the maximum limit ( 2^HEAP_MAX_CAPACITY )")] =
+            heap_start as *mut u8;
     }
 
     pub fn allocate(&mut self, mut size: usize) -> *mut u8 {
