@@ -25,3 +25,11 @@ Run this to automatically compile and run the hypervisor:
 ```sh
 cargo run
 ```
+
+## License
+This project is licensed under either of
+
+- [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- [MIT License](https://opensource.org/license/MIT)
+
+at your option.
