@@ -1,4 +1,4 @@
-use crate::{allocator::alloc_pages, guest_table::GuestPageTable};
+use crate::{allocator::alloc_pages, guest_table::GuestPageTable, read_csr};
 use core::{arch::asm, default::Default};
 
 #[derive(Debug, Default)]
@@ -74,6 +74,8 @@ impl Vcpu {
         }
     }
     pub fn run(&mut self) -> ! {
+        let time = read_csr!("time");
+        let vstimecmp = time + 10_000;
         unsafe {
             asm!(
                 "csrw hstatus, {hstatus}",
@@ -82,6 +84,7 @@ impl Vcpu {
                 "csrw hgatp, {hgatp}",
                 "csrw sepc, {sepc}",
                 "csrw vsstatus, {vsstatus}",
+                "csrw vstimecmp, {vstimecmp}",
                 "sret",
                 hstatus = in(reg) self.hstatus,
                 sstatus = in(reg) self.sstatus,
@@ -89,6 +92,7 @@ impl Vcpu {
                 sepc = in(reg) self.sepc,
                 sscratch = in(reg) (self as *mut Vcpu as usize),
                 vsstatus = in(reg) (self.vsstatus),
+                vstimecmp = in(reg) (vstimecmp),
             );
         }
         unreachable!();

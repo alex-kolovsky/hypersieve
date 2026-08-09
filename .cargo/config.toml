@@ -3,7 +3,7 @@ rustflags = [
     "-C", "link-arg=-T",
     "-C", "link-arg=linker.ld",
 ]
-runner = "qemu-system-riscv64 -machine virt -cpu rv64,h=true,v=true,vlen=128 -m 128M -serial mon:stdio -nographic -bios default -s -kernel" #"qemu-system-riscv64 -machine virt -m 16M -serial stdio -kernel" # chardev:serial0 -chardev stdio,id=serial0,signal=on -display none -S -s
+runner = "qemu-system-riscv64 -machine virt -cpu rv64,h=true,v=true,vlen=128,sstc=true -m 128M -serial mon:stdio -nographic -bios default -s -kernel" #"qemu-system-riscv64 -machine virt -m 16M -serial stdio -kernel" # chardev:serial0 -chardev stdio,id=serial0,signal=on -display none -S -s
 
 [build]
 target = "riscv64gc-unknown-none-elf"

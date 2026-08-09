@@ -1,9 +1,9 @@
-use crate::println;
 use crate::vcpu::Vcpu;
 use core::arch::naked_asm;
 use core::mem::offset_of;
 const SXLEN: u8 = 64;
 
+#[macro_export]
 macro_rules! read_csr {
     ($csr_name:expr) => {{
         let csr_value: u64;
