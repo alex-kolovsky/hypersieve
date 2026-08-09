@@ -12,7 +12,7 @@ you'll need the [clang](https://clang.org/) compiler infrastructure and [llvm-ob
 Execute this command inside the root directory of the project to build it:
 
 ```sh
-clang -Wall -Wextra --target=riscv64-unknown-elf -march=rv64gcv -ffreestanding -nostdlib -fuse-ld=lld -Wl,-eguest_boot -Wl,-Ttext=0x100000 -Wl,-Map=guest.map guest.S -o guest.elf && llvm-objcopy -O binary guest.elf guest.bin
+mkdir -p target/guest && clang -Wall -Wextra --target=riscv64-unknown-elf -march=rv64gcv -ffreestanding -nostdlib -fuse-ld=lld -Wl,-eguest_boot -Wl,-Ttext=0x100000 -Wl,-Map=target/guest/guest.map src/asm/guest.S -o target/guest/guest.elf && llvm-objcopy -O binary target/guest/guest.elf target/guest/guest.bin
 ```
 
 ### Running the hypervisor

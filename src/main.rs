@@ -39,7 +39,7 @@ pub extern "C" fn main() -> ! {
     }
     // Include guest bin file.
 
-    let kernel_image = include_bytes!("../guest.bin");
+    let kernel_image = include_bytes!("../target/guest/guest.bin");
     let guest_entry = 0x100000;
 
     // Copy guest kernel to a guest memory buffer.
