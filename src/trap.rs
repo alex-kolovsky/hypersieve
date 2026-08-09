@@ -1,3 +1,4 @@
+use crate::println;
 use crate::vcpu::Vcpu;
 use core::arch::naked_asm;
 use core::mem::offset_of;
@@ -111,8 +112,16 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     let scause_str: &str = if interrupt_bit == 1 {
         match exception_code {
             1 => "Supervisor software interrupt",
+            2 => "Virtual supervisor software interrupt",
+            3 => "Machine software interrupt",
             5 => "Supervisor timer interrupt",
+            6 => "Virtual supervisor timer interrupt",
+            7 => "Machine timer interrupt",
+
             9 => "Supervisor external interrupt",
+            10 => "Virtual supervisor external interrupt",
+            11 => "Machine external interrupt",
+            12 => "Supervisor guest external interrupt",
             13 => "Counter-overflow interrupt",
 
             _ => "Unhandable exception code",
@@ -146,8 +155,10 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         }
     };
     panic!(
-        "A trap occurred ({})\nvsstatus: {:#b}\nsstatus: {:#b}",
+        "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}",
         scause_str,
+        scause >> 63,
+        scause ^ (1u64 << 63),
         read_csr!("vsstatus"),
         read_csr!("sstatus"),
     );
