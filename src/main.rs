@@ -9,7 +9,11 @@ mod vcpu;
 
 extern crate alloc;
 
-use crate::allocator::BUDDY_ALLOCATOR;
+use crate::{
+    allocator::{BUDDY_ALLOCATOR, alloc_pages},
+    guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
+    vcpu::Vcpu,
+};
 use core::{
     arch::{asm, global_asm},
     panic::PanicInfo,
@@ -33,12 +37,24 @@ pub extern "C" fn main() -> ! {
         let mut heap = BUDDY_ALLOCATOR.heap.lock();
         heap.init();
     }
+    // Include guest bin file.
 
-    println!("Hello world!");
+    let kernel_image = include_bytes!("../guest.bin");
+    let guest_entry = 0x100000;
 
-    loop {
-        unsafe {
-            asm!("wfi");
-        }
+    // Copy guest kernel to a guest memory buffer.
+    let kernel_memory = alloc_pages(kernel_image.len());
+    unsafe {
+        let dst = kernel_memory;
+        let src = kernel_image.as_ptr();
+        core::ptr::copy_nonoverlapping(src, dst, kernel_image.len());
     }
+
+    // Map the guest memory into the guest page table.
+    let table = GuestPageTable::new();
+    table.map(guest_entry, kernel_memory as u64, PTE_R | PTE_W | PTE_X);
+
+    // Go to VS mode.
+    let mut vcpu = Vcpu::new(&table, guest_entry);
+    vcpu.run();
 }
