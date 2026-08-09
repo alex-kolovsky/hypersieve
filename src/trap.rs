@@ -145,5 +145,10 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             _ => "Unhandable exception code",
         }
     };
-    panic!("A trap occurred ({})", scause_str);
+    panic!(
+        "A trap occurred ({})\nvsstatus: {:#b}\nsstatus: {:#b}",
+        scause_str,
+        read_csr!("vsstatus"),
+        read_csr!("sstatus"),
+    );
 }

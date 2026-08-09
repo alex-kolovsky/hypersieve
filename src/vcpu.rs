@@ -44,6 +44,9 @@ pub struct Vcpu {
     pub sstatus: u64,
     pub sepc: u64,
     pub scause: u64,
+
+    // Virtual registers
+    pub vsstatus: u64,
 }
 impl Vcpu {
     pub fn new(table: &GuestPageTable, guest_entry: u64) -> Self {
@@ -51,7 +54,11 @@ impl Vcpu {
         hstatus |= 2 << 32; // set VSXL to 64 bits
         hstatus |= 1 << 7; // set
 
-        let sstatus: u64 = 1 << 8; // SPP: Supervisor Previous Privilege mode (VS-mode)
+        let vs: u64 = 1 << 9; // VS: Vector Status (Initial)
+        let vsstatus = vs;
+
+        let spp: u64 = 1 << 8; // SPP: Supervisor Previous Privilege mode (VS-mode)
+        let sstatus: u64 = spp | vs;
 
         let stack_size = 512 * 1024;
         let host_sp: u64 = alloc_pages(stack_size) as u64 + stack_size as u64;
@@ -62,6 +69,7 @@ impl Vcpu {
             sstatus,
             sepc: guest_entry,
             host_sp,
+            vsstatus,
             ..Default::default()
         }
     }
@@ -73,12 +81,14 @@ impl Vcpu {
                 "csrw sscratch, {sscratch}",
                 "csrw hgatp, {hgatp}",
                 "csrw sepc, {sepc}",
+                "csrw vsstatus, {vsstatus}",
                 "sret",
                 hstatus = in(reg) self.hstatus,
                 sstatus = in(reg) self.sstatus,
                 hgatp = in(reg) self.hgatp,
                 sepc = in(reg) self.sepc,
                 sscratch = in(reg) (self as *mut Vcpu as usize),
+                vsstatus = in(reg) (self.vsstatus),
             );
         }
         unreachable!();
