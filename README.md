@@ -33,3 +33,6 @@ This project is licensed under either of
 - [MIT License](https://opensource.org/license/MIT)
 
 at your option.
+
+
+<sub>Copyright (c) 2026 Alex Kolovsky. All rights reserved.</sub>
