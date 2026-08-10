@@ -50,15 +50,19 @@ pub struct Vcpu {
 }
 impl Vcpu {
     pub fn new(table: &GuestPageTable, guest_entry: u64) -> Self {
-        let mut hstatus: u64 = 0;
-        hstatus |= 2 << 32; // set VSXL to 64 bits
-        hstatus |= 1 << 7; // set
+        // Set the XLEN for VS-mode (VSXL bitfield) to 64 bits in hstatus.
+        let vsxl: u64 = 2 << 32;
+        // Set Supervisor Previous Virtualization (SPV) to 1 so the sret instruction boots the CPU into virtual mode.
+        let spv: u64 = 1 << 7;
+        let hstatus: u64 = spv | vsxl; // hstatus: Hypervisor Status
 
-        let vs: u64 = 1 << 9; // VS: Vector Status (Initial)
-        let vsstatus = vs;
+        // Set the Vector Status (VS) bitfield in vsstatus to enable vector extension in VS-mode.
+        let vs: u64 = 1 << 9;
+        let vsstatus = vs; // vsstatus: Virtual Supervisor Status
 
-        let spp: u64 = 1 << 8; // SPP: Supervisor Previous Privilege mode (VS-mode)
-        let sstatus: u64 = spp | vs;
+        // Set Supervisor Previous Privilege mode (SPP) to 1 so the sret instruction boots the CPU into Supervisor mode (VS-mode in our case).
+        let spp: u64 = 1 << 8;
+        let sstatus: u64 = spp | vs; // sstatus: Supervisor Status
 
         let stack_size = 512 * 1024;
         let host_sp: u64 = alloc_pages(stack_size) as u64 + stack_size as u64;
