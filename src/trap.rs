@@ -1,3 +1,4 @@
+use crate::println;
 use crate::vcpu::Vcpu;
 use core::arch::naked_asm;
 use core::mem::offset_of;
@@ -202,12 +203,26 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             _ => "Unhandable exception code",
         }
     };
-    panic!(
-        "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}",
+    println!(
+        "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
         scause_str,
-        scause >> 63,
-        scause ^ (1u64 << 63),
+        interrupt_bit,
+        exception_code,
         read_csr!("vsstatus"),
         read_csr!("sstatus"),
+        read_csr!("sepc"),
     );
+    if exception_code == 6 && interrupt_bit == 1 {
+        unsafe {
+            (*vcpu).run();
+        }
+    }
+
+    if exception_code == 10 && interrupt_bit == 0 {
+        unsafe {
+            (*vcpu).sepc += 4;
+            (*vcpu).run();
+        }
+    }
+    panic!();
 }
