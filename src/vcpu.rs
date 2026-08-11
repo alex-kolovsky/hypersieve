@@ -1,6 +1,7 @@
 use crate::{allocator::alloc_pages, guest_table::GuestPageTable, read_csr};
 use core::{arch::asm, default::Default};
 
+#[repr(C)]
 #[derive(Debug, Default)]
 pub struct Vcpu {
     // Host registers
@@ -45,8 +46,15 @@ pub struct Vcpu {
     pub sepc: u64,
     pub scause: u64,
 
-    // Virtual registers
+    // Virtual-mode registers
     pub vsstatus: u64,
+    pub vstvec: u64,
+    pub vsscratch: u64,
+    pub vsepc: u64,
+    pub vscause: u64,
+    pub vstval: u64,
+    pub vsie: u64,
+    pub vsatp: u64,
 }
 impl Vcpu {
     pub fn new(table: &GuestPageTable, guest_entry: u64) -> Self {

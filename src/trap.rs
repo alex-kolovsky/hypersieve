@@ -54,9 +54,43 @@ pub extern "C" fn trap_handler() {
         "sd t5, {t5_offset}(a0)",
         "sd t6, {t6_offset}(a0)",
 
-        // Save scause
+        // Save CSRs
         "csrr t0, scause",
         "sd t0, {scause_offset}(a0)",
+
+        "csrr t0, sepc",
+        "sd t0, {sepc_offset}(a0)",
+
+        "csrr t0, sepc",
+        "sd t0, {sepc_offset}(a0)",
+
+        "csrr t0, hstatus",
+        "sd t0, {hstatus_offset}(a0)",
+
+        "csrr t0, vsstatus",
+        "sd t0, {vsstatus_offset}(a0)",
+
+        "csrr t0, vstvec",
+        "sd t0, {vstvec_offset}(a0)",
+
+        "csrr t0, vsscratch",
+        "sd t0, {vsscratch_offset}(a0)",
+
+        "csrr t0, vsepc",
+        "sd t0, {vsepc_offset}(a0)",
+
+        "csrr t0, vscause",
+        "sd t0, {vscause_offset}(a0)",
+
+        "csrr t0, vstval",
+        "sd t0, {vstval_offset}(a0)",
+
+        "csrr t0, vsie",
+        "sd t0, {vsie_offset}(a0)",
+
+        "csrr t0, vsatp",
+        "sd t0, {vsatp_offset}(a0)",
+
         // Restore a0 from sscratch, and save in to VCpu.
         "csrr t0, sscratch",
         "sd t0, {a0_offset}(a0)",
@@ -67,8 +101,22 @@ pub extern "C" fn trap_handler() {
         // a0 (first argument) is still the vcpu pointer here.
         "call {handle_trap}",
         handle_trap = sym handle_trap,
+        //CSRs
+
         scause_offset = const offset_of!(Vcpu, scause),
+        sepc_offset = const offset_of!(Vcpu, sepc),
+        hstatus_offset = const core::mem::offset_of!(Vcpu, hstatus),
+        vsstatus_offset = const core::mem::offset_of!(Vcpu, vsstatus),
+        vstvec_offset = const core::mem::offset_of!(Vcpu, vstvec),
+        vsscratch_offset = const core::mem::offset_of!(Vcpu, vsscratch),
+        vsepc_offset = const core::mem::offset_of!(Vcpu, vsepc),
+        vscause_offset = const core::mem::offset_of!(Vcpu, vscause),
+        vstval_offset = const core::mem::offset_of!(Vcpu, vstval),
+        vsie_offset = const core::mem::offset_of!(Vcpu, vsie),
+        vsatp_offset = const core::mem::offset_of!(Vcpu, vsatp),
         host_sp_offset = const offset_of!(Vcpu, host_sp),
+
+        // GPRs
         ra_offset = const offset_of!(Vcpu, ra),
         sp_offset = const offset_of!(Vcpu, sp),
         gp_offset = const offset_of!(Vcpu, gp),
