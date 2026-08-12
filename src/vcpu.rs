@@ -1,5 +1,5 @@
 use crate::{allocator::alloc_pages, guest_table::GuestPageTable, read_csr};
-use core::{arch::asm, default::Default};
+use core::default::Default;
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -88,25 +88,144 @@ impl Vcpu {
     pub fn run(&mut self) -> ! {
         let time = read_csr!("time");
         let vstimecmp = time + 10_000;
+
         unsafe {
-            asm!(
-                "csrw hstatus, {hstatus}",
-                "csrw sstatus, {sstatus}",
-                "csrw sscratch, {sscratch}",
-                "csrw hgatp, {hgatp}",
-                "csrw sepc, {sepc}",
-                "csrw vsstatus, {vsstatus}",
-                "csrw vstimecmp, {vstimecmp}",
-                "sret",
-                hstatus = in(reg) self.hstatus,
-                sstatus = in(reg) self.sstatus,
-                hgatp = in(reg) self.hgatp,
-                sepc = in(reg) self.sepc,
-                sscratch = in(reg) (self as *mut Vcpu as usize),
-                vsstatus = in(reg) (self.vsstatus),
-                vstimecmp = in(reg) (vstimecmp),
-            );
+            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
         }
+
         unreachable!();
     }
+}
+
+use core::arch::naked_asm;
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) {
+    naked_asm!(
+        "mv t0, a0",
+
+        "ld t1, {hstatus_offset}(t0)",
+        "csrw hstatus, t1",
+
+        "ld t1, {sstatus_offset}(t0)",
+        "csrw sstatus, t1",
+
+        "ld t1, {hgatp_offset}(t0)",
+        "csrw hgatp, t1",
+
+        "ld t1, {sepc_offset}(t0)",
+        "csrw sepc, t1",
+
+        "ld t1, {vsstatus_offset}(t0)",
+        "csrw vsstatus, t1",
+
+        "ld t1, {vstvec_offset}(t0)",
+        "csrw vstvec, t1",
+
+        "ld t1, {vsscratch_offset}(t0)",
+        "csrw vsscratch, t1",
+
+        "ld t1, {vsepc_offset}(t0)",
+        "csrw vsepc, t1",
+
+        "ld t1, {vscause_offset}(t0)",
+        "csrw vscause, t1",
+
+        "ld t1, {vstval_offset}(t0)",
+        "csrw vstval, t1",
+
+        "ld t1, {vsie_offset}(t0)",
+        "csrw vsie, t1",
+
+        "ld t1, {vsatp_offset}(t0)",
+        "csrw vsatp, t1",
+
+        "csrw vstimecmp, a1",
+
+        "csrw sscratch, t0",
+
+        "ld ra, {ra_offset}(t0)",
+        "ld sp, {sp_offset}(t0)",
+        "ld gp, {gp_offset}(t0)",
+        "ld tp, {tp_offset}(t0)",
+        "ld t1, {t1_offset}(t0)",
+        "ld t2, {t2_offset}(t0)",
+        "ld s0, {s0_offset}(t0)",
+        "ld s1, {s1_offset}(t0)",
+
+        "ld a0, {a0_offset}(t0)",
+        "ld a1, {a1_offset}(t0)",
+        "ld a2, {a2_offset}(t0)",
+        "ld a3, {a3_offset}(t0)",
+        "ld a4, {a4_offset}(t0)",
+        "ld a5, {a5_offset}(t0)",
+        "ld a6, {a6_offset}(t0)",
+        "ld a7, {a7_offset}(t0)",
+
+        "ld s2, {s2_offset}(t0)",
+        "ld s3, {s3_offset}(t0)",
+        "ld s4, {s4_offset}(t0)",
+        "ld s5, {s5_offset}(t0)",
+        "ld s6, {s6_offset}(t0)",
+        "ld s7, {s7_offset}(t0)",
+        "ld s8, {s8_offset}(t0)",
+        "ld s9, {s9_offset}(t0)",
+        "ld s10, {s10_offset}(t0)",
+        "ld s11, {s11_offset}(t0)",
+
+        "ld t3, {t3_offset}(t0)",
+        "ld t4, {t4_offset}(t0)",
+        "ld t5, {t5_offset}(t0)",
+        "ld t6, {t6_offset}(t0)",
+
+        "ld t0, {t0_offset}(t0)",
+
+        "sret",
+
+        hstatus_offset = const core::mem::offset_of!(Vcpu, hstatus),
+        sstatus_offset = const core::mem::offset_of!(Vcpu, sstatus),
+        hgatp_offset = const core::mem::offset_of!(Vcpu, hgatp),
+        sepc_offset = const core::mem::offset_of!(Vcpu, sepc),
+        vsstatus_offset = const core::mem::offset_of!(Vcpu, vsstatus),
+
+        vstvec_offset = const core::mem::offset_of!(Vcpu, vstvec),
+        vsscratch_offset = const core::mem::offset_of!(Vcpu, vsscratch),
+        vsepc_offset = const core::mem::offset_of!(Vcpu, vsepc),
+        vscause_offset = const core::mem::offset_of!(Vcpu, vscause),
+        vstval_offset = const core::mem::offset_of!(Vcpu, vstval),
+        vsie_offset = const core::mem::offset_of!(Vcpu, vsie),
+        vsatp_offset = const core::mem::offset_of!(Vcpu, vsatp),
+
+        ra_offset = const core::mem::offset_of!(Vcpu, ra),
+        sp_offset = const core::mem::offset_of!(Vcpu, sp),
+        gp_offset = const core::mem::offset_of!(Vcpu, gp),
+        tp_offset = const core::mem::offset_of!(Vcpu, tp),
+        t0_offset = const core::mem::offset_of!(Vcpu, t0),
+        t1_offset = const core::mem::offset_of!(Vcpu, t1),
+        t2_offset = const core::mem::offset_of!(Vcpu, t2),
+        s0_offset = const core::mem::offset_of!(Vcpu, s0),
+        s1_offset = const core::mem::offset_of!(Vcpu, s1),
+        a0_offset = const core::mem::offset_of!(Vcpu, a0),
+        a1_offset = const core::mem::offset_of!(Vcpu, a1),
+        a2_offset = const core::mem::offset_of!(Vcpu, a2),
+        a3_offset = const core::mem::offset_of!(Vcpu, a3),
+        a4_offset = const core::mem::offset_of!(Vcpu, a4),
+        a5_offset = const core::mem::offset_of!(Vcpu, a5),
+        a6_offset = const core::mem::offset_of!(Vcpu, a6),
+        a7_offset = const core::mem::offset_of!(Vcpu, a7),
+        s2_offset = const core::mem::offset_of!(Vcpu, s2),
+        s3_offset = const core::mem::offset_of!(Vcpu, s3),
+        s4_offset = const core::mem::offset_of!(Vcpu, s4),
+        s5_offset = const core::mem::offset_of!(Vcpu, s5),
+        s6_offset = const core::mem::offset_of!(Vcpu, s6),
+        s7_offset = const core::mem::offset_of!(Vcpu, s7),
+        s8_offset = const core::mem::offset_of!(Vcpu, s8),
+        s9_offset = const core::mem::offset_of!(Vcpu, s9),
+        s10_offset = const core::mem::offset_of!(Vcpu, s10),
+        s11_offset = const core::mem::offset_of!(Vcpu, s11),
+        t3_offset = const core::mem::offset_of!(Vcpu, t3),
+        t4_offset = const core::mem::offset_of!(Vcpu, t4),
+        t5_offset = const core::mem::offset_of!(Vcpu, t5),
+        t6_offset = const core::mem::offset_of!(Vcpu, t6),
+    );
 }
