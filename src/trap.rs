@@ -1,6 +1,6 @@
-use crate::println;
 use crate::vcpu::Vcpu;
-use core::arch::naked_asm;
+use crate::{print, println};
+use core::arch::{asm, naked_asm};
 use core::mem::offset_of;
 const SXLEN: u8 = 64;
 
@@ -212,6 +212,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         read_csr!("sstatus"),
         read_csr!("sepc"),
     );
+
     if exception_code == 6 && interrupt_bit == 1 {
         unsafe {
             (*vcpu).run();
@@ -220,6 +221,27 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
 
     if exception_code == 10 && interrupt_bit == 0 {
         unsafe {
+            match (*vcpu).a7 {
+                // Base extension
+                0x10 => {
+                    let a7 = (*vcpu).a7;
+                    let a6 = (*vcpu).a6;
+                    let mut a1 = (*vcpu).a1;
+                    let mut a0 = (*vcpu).a0;
+                    asm!("ecall", inout("a0") a0, inout("a1") a1, in("a7") a7, in("a6") a6);
+                    (*vcpu).a1 = a1;
+                    (*vcpu).a0 = a0;
+                }
+                // Legacy putchar extension
+                0x01 => {
+                    let a0 = (*vcpu).a0;
+
+                    print!("{}", a0 as u8 as char);
+                }
+                _ => {
+                    panic!("Ecall EID cannot be processed.")
+                }
+            }
             (*vcpu).sepc += 4;
             (*vcpu).run();
         }
