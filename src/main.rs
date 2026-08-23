@@ -12,6 +12,7 @@ extern crate alloc;
 use crate::{
     allocator::{BUDDY_ALLOCATOR, alloc_pages},
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
+    uart::UART,
     vcpu::Vcpu,
 };
 use core::{
@@ -35,6 +36,8 @@ fn panic(info: &PanicInfo) -> ! {
 pub extern "C" fn main() -> ! {
     {
         let mut heap = BUDDY_ALLOCATOR.heap.lock();
+        let uart = UART.lock();
+        uart.init();
         heap.init();
     }
 

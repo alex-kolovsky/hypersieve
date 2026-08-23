@@ -23,12 +23,10 @@ impl core::fmt::Write for Uart {
 
 impl Uart {
     pub fn new(base_addr: u64) -> Self {
-        let uart = Self { base_addr };
-        uart.init();
-        uart
+        Self { base_addr }
     }
 
-    fn init(&self) {
+    pub fn init(&self) {
         let uart_ptr = self.base_addr as *mut u8;
         unsafe {
             // Enable hardware FIFO buffers in FCR.
@@ -41,7 +39,7 @@ impl Uart {
             write_volatile(uart_ptr.offset(3), 1 << 7);
 
             // Divisor = ( system_clock_speed ) / ( 16 * desired_baud_rate )
-            let divisor = 1_000_000 / (16 * 9600);
+            let divisor = 3_686_400 / (16 * 115_200);
 
             let divisor_least: u8 = (divisor & 0xff).try_into().unwrap();
             let divisor_most: u8 = (divisor >> 8).try_into().unwrap();
