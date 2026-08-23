@@ -41,7 +41,10 @@ pub extern "C" fn main(hart_id: usize) -> ! {
         heap.init();
     }
 
+    hart_configure();
+
     // Start all other harts if available.
+
     let mut error_code: isize = 0;
     let mut value: isize = 0;
     let mut cur_hart_id: usize = 0;
@@ -62,29 +65,6 @@ pub extern "C" fn main(hart_id: usize) -> ! {
     // Error code will be equal to 3 if there's no core with that number, it means the other cores have started.
     if error_code != -3 {
         panic!("Failed to start harts.\nError code: {error_code}\nValue: {value}");
-     }
-
-    // Set the VS Timer Interrupt Enable (VSTIE) bit in hie to allow timer interrupts in VS mode.
-    let hie_vstie = 1 << 6;
-    let hie = read_csr!("hie") | hie_vstie; // hie: Hypervisor Interrupt Enable
-
-    // Set the Supervisor Timer Interrupt Enable (STIE) bit in vsie to handle guest timer interrupts.
-    let vsie_stie = 1 << 6;
-    let vsie = read_csr!("vsie") | vsie_stie; // vsie: Virtual Supervisor Interrupt Enable
-
-    // Set the STimecmp Enable (STCE) bit in henvcfg to enable S/VS mode time comparators.
-    let henvcfg_stce = 1 << 63;
-    let henvcfg = read_csr!("henvcfg") | henvcfg_stce; // henvcfg: Hypervisor Environment Configuration
-
-    unsafe {
-        asm!(
-            "csrw hie, {hie}",
-            "csrw henvcfg, {henvcfg}",
-            "csrw vsie, {vsie}",
-            hie = in(reg) hie,
-            henvcfg = in(reg) henvcfg,
-            vsie = in(reg) vsie,
-        );
     }
 
     // Include guest binary file.
@@ -141,5 +121,32 @@ fn hart_init(_: usize, sp_end: usize) {
         );
         println!("Hello From Hart");
     }
+    hart_configure();
     panic!();
+}
+
+#[inline(always)]
+fn hart_configure() {
+    // Set the VS Timer Interrupt Enable (VSTIE) bit in hie to allow timer interrupts in VS mode.
+    let hie_vstie = 1 << 6;
+    let hie = read_csr!("hie") | hie_vstie; // hie: Hypervisor Interrupt Enable
+
+    // Set the Supervisor Timer Interrupt Enable (STIE) bit in vsie to handle guest timer interrupts.
+    let vsie_stie = 1 << 6;
+    let vsie = read_csr!("vsie") | vsie_stie; // vsie: Virtual Supervisor Interrupt Enable
+
+    // Set the STimecmp Enable (STCE) bit in henvcfg to enable S/VS mode time comparators.
+    let henvcfg_stce = 1 << 63;
+    let henvcfg = read_csr!("henvcfg") | henvcfg_stce; // henvcfg: Hypervisor Environment Configuration
+
+    unsafe {
+        asm!(
+            "csrw hie, {hie}",
+            "csrw henvcfg, {henvcfg}",
+            "csrw vsie, {vsie}",
+            hie = in(reg) hie,
+            henvcfg = in(reg) henvcfg,
+            vsie = in(reg) vsie,
+        );
+    }
 }
