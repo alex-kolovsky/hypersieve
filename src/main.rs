@@ -33,13 +33,36 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn main() -> ! {
+pub extern "C" fn main(hart_id: usize) -> ! {
     {
         let mut heap = BUDDY_ALLOCATOR.heap.lock();
         let uart = UART.lock();
         uart.init();
         heap.init();
     }
+
+    // Start all other harts if available.
+    let mut error_code: isize = 0;
+    let mut value: isize = 0;
+    let mut cur_hart_id: usize = 0;
+
+    while error_code == 0 {
+        // Skip main hart.
+        if cur_hart_id != hart_id {
+            // Allocate stack for hart.
+            let stack_size: usize = 1_000_000;
+            let sp: usize = alloc_pages(stack_size) as usize;
+            let sp_end = sp + stack_size;
+            (error_code, value) =
+                sbi_hart_start(cur_hart_id, hart_init as *const () as usize, sp_end);
+        }
+        cur_hart_id += 1;
+    }
+
+    // Error code will be equal to 3 if there's no core with that number, it means the other cores have started.
+    if error_code != -3 {
+        panic!("Failed to start harts.\nError code: {error_code}\nValue: {value}");
+     }
 
     // Set the VS Timer Interrupt Enable (VSTIE) bit in hie to allow timer interrupts in VS mode.
     let hie_vstie = 1 << 6;
@@ -83,4 +106,40 @@ pub extern "C" fn main() -> ! {
     // Switch to VS mode.
     let mut vcpu = Vcpu::new(&table, guest_entry);
     vcpu.run();
+}
+
+#[inline(always)]
+fn sbi_hart_start(hart_id: usize, start_addr: usize, opaque: usize) -> (isize, isize) {
+    let error: isize;
+    let value: isize;
+
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            in("a0") hart_id,
+            in("a1") start_addr,
+            in("a2") opaque,
+            in("a6") 0,
+            in("a7") 0x48534D,
+            lateout("a0") error,
+            lateout("a1") value,
+        );
+    }
+
+    (error, value)
+}
+
+fn hart_init(_: usize, sp_end: usize) {
+    unsafe {
+        core::arch::asm!(
+            // Load stack pointer.
+            "mv sp, {sp}",
+            // Load trap handler function address.
+            "la t0, trap_handler",
+            "csrw stvec, t0",
+            sp = in(reg) sp_end,
+        );
+        println!("Hello From Hart");
+    }
+    panic!();
 }
