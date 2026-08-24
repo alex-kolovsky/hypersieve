@@ -1,8 +1,4 @@
-use crate::{
-    allocator::{BUDDY_ALLOCATOR, alloc_pages},
-    println, read_csr,
-};
-use core::alloc::GlobalAlloc;
+use crate::{allocator::alloc_pages, println, read_csr};
 use core::arch::asm;
 
 #[inline(always)]
@@ -26,22 +22,22 @@ fn sbi_hart_start(hart_id: usize, start_addr: usize, opaque: usize) -> (isize, i
     (error, value)
 }
 
-fn hart_init(_: usize, sp_end: usize) {
-    let hart_id: usize;
-    unsafe {
-        core::arch::asm!(
-            // Load stack pointer.
-            "mv sp, {sp}",
-            // Load trap handler function address.
-            "la t0, trap_handler",
-            "csrw stvec, t0",
-            "mv {id}, a0",
-            sp = in(reg) sp_end,
-            id = out(reg) hart_id,
-        );
-    }
+#[unsafe(naked)]
+pub extern "C" fn hart_entry() {
+    core::arch::naked_asm!(
+        // Load stack pointer.
+        "mv sp, a1",
+        // Load trap handler function address.
+        "la t0, trap_handler",
+        "csrw stvec, t0",
+        "j hart_init",
+    );
+}
 
-    println!("Hello from hart {hart_id}");
+#[unsafe(no_mangle)]
+fn hart_init(hart_id: usize) {
+    println!("hart_id: {hart_id}");
+
     hart_configure();
 
     panic!();
@@ -75,34 +71,44 @@ pub fn hart_configure() {
 
 #[inline(always)]
 pub fn start_harts(main_hart_id: usize) {
+    number_of_harts();
     let mut error_code: isize = 0;
     let mut value: isize = 0;
-    let mut hart_id: usize = 0;
-    let mut sp: *mut u8 = core::ptr::null_mut();
-    let mut stack_size: usize = 0;
+    let stack_size = 1024 * 1024;
+    let mut sp: *mut u8;
 
-    while error_code == 0 {
+    for hart_id in 0..number_of_harts() {
         // Skip main hart.
         if hart_id != main_hart_id {
             // Allocate stack for hart.
-            stack_size = 1024 * 1024;
             sp = alloc_pages(stack_size);
             let sp_end = (sp as usize) + stack_size;
-            (error_code, value) = sbi_hart_start(hart_id, hart_init as *const () as usize, sp_end);
+            (error_code, value) = sbi_hart_start(hart_id, hart_entry as *const () as usize, sp_end);
         }
-        hart_id += 1;
     }
 
     // Error code will be equal to 3 if there's no core with that number, it means the other cores have started.
     if error_code != -3 {
         panic!("Failed to start harts.\nError code: {error_code}\nValue: {value}");
-    } else {
-        // Deallocate nonexistent hart stack.
+    }
+}
+
+fn number_of_harts() -> usize {
+    let mut id: usize = 0;
+    let mut error_code: usize = 0;
+    while error_code == 0 {
         unsafe {
-            BUDDY_ALLOCATOR.dealloc(
-                sp,
-                core::alloc::Layout::from_size_align(stack_size, 4096).unwrap(),
+            asm!("li a7, 0x48534D",
+                "li a6, 0x02",
+                "mv a0, {id}",
+                "ecall",
+                "move {error_code}, a0",
+                id = in(reg) id,
+                error_code = out(reg) error_code
             );
         }
+        id += 1;
     }
+
+    id + 1
 }
