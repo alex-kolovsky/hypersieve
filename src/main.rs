@@ -16,6 +16,7 @@ use crate::{
     vcpu::Vcpu,
 };
 use core::{
+    alloc::GlobalAlloc,
     arch::{asm, global_asm},
     panic::PanicInfo,
 };
@@ -48,14 +49,16 @@ pub extern "C" fn main(hart_id: usize) -> ! {
     let mut error_code: isize = 0;
     let mut value: isize = 0;
     let mut cur_hart_id: usize = 0;
+    let mut sp: *mut u8 = core::ptr::null_mut();
+    let mut stack_size: usize = 0;
 
     while error_code == 0 {
         // Skip main hart.
         if cur_hart_id != hart_id {
             // Allocate stack for hart.
-            let stack_size: usize = 1_000_000;
-            let sp: usize = alloc_pages(stack_size) as usize;
-            let sp_end = sp + stack_size;
+            stack_size = 1_000_000;
+            sp = alloc_pages(stack_size);
+            let sp_end = (sp as usize) + stack_size;
             (error_code, value) =
                 sbi_hart_start(cur_hart_id, hart_init as *const () as usize, sp_end);
         }
@@ -65,6 +68,14 @@ pub extern "C" fn main(hart_id: usize) -> ! {
     // Error code will be equal to 3 if there's no core with that number, it means the other cores have started.
     if error_code != -3 {
         panic!("Failed to start harts.\nError code: {error_code}\nValue: {value}");
+    } else {
+        // Deallocate nonexistent hart stack.
+        unsafe {
+            BUDDY_ALLOCATOR.dealloc(
+                sp,
+                core::alloc::Layout::from_size_align(stack_size, 4096).unwrap(),
+            );
+        }
     }
 
     // Include guest binary file.
