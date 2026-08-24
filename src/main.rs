@@ -56,7 +56,7 @@ pub extern "C" fn main(hart_id: usize) -> ! {
         // Skip main hart.
         if cur_hart_id != hart_id {
             // Allocate stack for hart.
-            stack_size = 1_000_000;
+            stack_size = 1024 * 1024;
             sp = alloc_pages(stack_size);
             let sp_end = (sp as usize) + stack_size;
             (error_code, value) =
