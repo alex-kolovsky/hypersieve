@@ -16,7 +16,6 @@ use crate::{
     guest::Guest,
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
     uart::UART,
-    vcpu::Vcpu,
 };
 use core::{
     arch::{asm, global_asm},
@@ -51,23 +50,31 @@ pub extern "C" fn main(hart_id: usize) -> ! {
     // Start all other harts if available.
     multihart::start_harts(hart_id);
 
-    // Include guest binary file.
-    let kernel_image = include_bytes!("../target/guest/guest.bin");
-    let guest_entry = 0x100000;
+    // Fill GUESTS array with VCPUs.
+    let mut guests = GUESTS.lock();
+    for guest in guests.iter_mut() {
+        guest.vcpu = allocate_guest_memory(guest.entry_gpa, guest.data);
+    }
 
+    guests[1].vcpu.run();
+}
+
+fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> crate::vcpu::Vcpu {
     // Copy guest kernel to a guest memory buffer.
-    let kernel_memory = alloc_pages(kernel_image.len());
+    let kernel_memory = alloc_pages(image.len());
     unsafe {
         let dst = kernel_memory;
-        let src = kernel_image.as_ptr();
-        core::ptr::copy_nonoverlapping(src, dst, kernel_image.len());
+        let src = image.as_ptr();
+        core::ptr::copy_nonoverlapping(src, dst, image.len());
     }
 
     // Map the guest memory into the guest page table.
     let table = GuestPageTable::new();
-    table.map(guest_entry, kernel_memory as u64, PTE_R | PTE_W | PTE_X);
+    table.map(
+        guest_entry_gpa as u64,
+        kernel_memory as u64,
+        PTE_R | PTE_W | PTE_X,
+    );
 
-    // Switch to VS mode.
-    let mut vcpu = Vcpu::new(&table, guest_entry);
-    vcpu.run();
+    crate::vcpu::Vcpu::new(&table, guest_entry_gpa as u64)
 }

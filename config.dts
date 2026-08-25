@@ -11,15 +11,15 @@
             harts-cap = <2>;
             dedicated-harts = <100 2 3>;
 
-            entry = <0x1000>;
+            entry = <0x100000>;
         };
 
         vm1 {
-            path = "guests/guest.bin";
+            path = "target/guest-2/guest.bin";
 
             harts-cap = <3>;
 
-            entry = <0x82200000>;
+            entry = <0x100000>;
         };
     };
 };
