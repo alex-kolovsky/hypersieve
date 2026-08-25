@@ -13,6 +13,7 @@ extern crate alloc;
 
 use crate::{
     allocator::{BUDDY_ALLOCATOR, alloc_pages},
+    guest::Guest,
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
     uart::UART,
     vcpu::Vcpu,
@@ -23,6 +24,8 @@ use core::{
 };
 
 global_asm!(include_str!("asm/boot.S"));
+
+include!(concat!(env!("OUT_DIR"), "/guests.rs"));
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
