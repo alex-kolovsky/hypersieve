@@ -203,23 +203,12 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             _ => "Unhandable exception code",
         }
     };
-    println!(
-        "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
-        scause_str,
-        interrupt_bit,
-        exception_code,
-        read_csr!("vsstatus"),
-        read_csr!("sstatus"),
-        read_csr!("sepc"),
-    );
 
     if exception_code == 6 && interrupt_bit == 1 {
         unsafe {
             (*vcpu).run();
         }
-    }
-
-    if exception_code == 10 && interrupt_bit == 0 {
+    } else if exception_code == 10 && interrupt_bit == 0 {
         unsafe {
             match (*vcpu).a7 {
                 // Base extension
@@ -245,6 +234,16 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             (*vcpu).sepc += 4;
             (*vcpu).run();
         }
+    } else {
+        println!(
+            "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
+            scause_str,
+            interrupt_bit,
+            exception_code,
+            read_csr!("vsstatus"),
+            read_csr!("sstatus"),
+            read_csr!("sepc"),
+        );
     }
     panic!();
 }

@@ -1,5 +1,3 @@
-use crate::println;
-
 pub const PTE_R: u64 = 1 << 1;
 pub const PTE_W: u64 = 1 << 2;
 pub const PTE_X: u64 = 1 << 3;
@@ -77,7 +75,6 @@ impl GuestPageTable {
         }
 
         let entry = table.entry_by_addr(guest_paddr, 0);
-        println!("map: {:#x} -> {:#x}", guest_paddr, host_paddr);
         assert!(!entry.is_valid(), "already mapped");
         *entry = PageEntry::new(host_paddr, flags | PTE_V | PTE_U);
     }
