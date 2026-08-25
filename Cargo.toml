@@ -3,6 +3,7 @@ name = "hypersieve"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+build = "build.rs"
 
 [profile.dev]
 panic = "abort"
@@ -12,3 +13,6 @@ panic = "abort"
 
 [dependencies]
 spin = "0.12.2"
+
+[build-dependencies]
+fdt = "0.1.5"

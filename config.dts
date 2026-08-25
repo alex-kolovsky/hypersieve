@@ -1,0 +1,25 @@
+/dts-v1/;
+
+/ {
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    hypervisor-config {
+        vm0 {
+            path = "target/guest/guest.bin";
+
+            harts-cap = <2>;
+            dedicated-harts = <100 2 3>;
+
+            entry = <0x1000>;
+        };
+
+        vm1 {
+            path = "guests/guest.bin";
+
+            harts-cap = <3>;
+
+            entry = <0x82200000>;
+        };
+    };
+};
