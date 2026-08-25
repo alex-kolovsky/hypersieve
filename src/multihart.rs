@@ -87,28 +87,31 @@ pub fn start_harts(main_hart_id: usize) {
         }
     }
 
-    // Error code will be equal to 3 if there's no core with that number, it means the other cores have started.
-    if error_code != -3 {
-        panic!("Failed to start harts.\nError code: {error_code}\nValue: {value}");
+    if error_code != 0 {
+        panic!("Error occurred while waking up harts\nError code: {error_code}\nValue: {value}");
     }
 }
 
-fn number_of_harts() -> usize {
+pub fn number_of_harts() -> usize {
     let mut id: usize = 0;
     let mut error_code: usize = 0;
-    while error_code == 0 {
+    loop {
         unsafe {
-            asm!("li a7, 0x48534D",
-                "li a6, 0x02",
-                "mv a0, {id}",
+            asm!(
                 "ecall",
-                "move {error_code}, a0",
-                id = in(reg) id,
-                error_code = out(reg) error_code
+                in("a0") id,
+                in("a7") 0x48534D,
+                in("a6") 0x02,
+                lateout("a0") error_code,
             );
         }
+
+        if error_code != 0 {
+            break;
+        }
+
         id += 1;
     }
 
-    id + 1
+    id
 }
