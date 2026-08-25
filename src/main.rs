@@ -2,6 +2,7 @@
 #![no_main]
 
 mod allocator;
+mod guest;
 mod guest_table;
 mod multihart;
 mod trap;
