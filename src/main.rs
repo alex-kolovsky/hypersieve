@@ -55,7 +55,7 @@ pub extern "C" fn main(hart_id: usize) -> ! {
 
                     // Load this vcpu pointer into guest.vcpu_ptrs[i].
                     let vcpu_ptr = guest.vcpu_ptrs.get();
-                    (*vcpu_ptr)[i] = Some(core::sync::atomic::AtomicPtr::new(vcpu));
+                    (*vcpu_ptr)[i] = Some(vcpu);
                 } else {
                     unreachable!();
                 }
