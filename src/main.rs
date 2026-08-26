@@ -37,7 +37,7 @@ pub extern "C" fn main(hart_id: usize) -> ! {
 
     // Fill the guests with VCPUs.
     for guest in GUESTS.iter() {
-        let vcpus: *mut [Option<Vcpu>; MAX_HARTS_CAP] = guest.vcpus.get();
+        let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
         for i in 0..guest.harts_cap {
             // Get the pointer to the first vCPU in guest.vcpus.

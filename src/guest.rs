@@ -1,5 +1,5 @@
 use crate::{
-    MAX_HARTS_CAP,
+    MAX_SUPPORTED_DEDICATED_HARTS_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST,
     allocator::alloc_pages,
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
     vcpu::Vcpu,
@@ -9,10 +9,11 @@ use core::cell::UnsafeCell;
 #[derive(Debug)]
 pub struct Guest {
     pub entry_gpa: usize,
-    pub vcpu_ptrs: UnsafeCell<[Option<*mut Vcpu>; MAX_HARTS_CAP]>,
-    pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_HARTS_CAP]>,
+    pub vcpu_ptrs: UnsafeCell<[Option<*mut Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
+    pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub harts: core::sync::atomic::AtomicUsize,
     pub harts_cap: usize,
+    pub dedicated_harts: Option<[u32; MAX_SUPPORTED_DEDICATED_HARTS_PER_GUEST]>,
     pub data: &'static [u8],
 }
 
