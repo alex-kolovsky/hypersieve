@@ -9,7 +9,7 @@
             path = "target/guest-1/guest-1.bin";
 
             harts-cap = <2>;
-            dedicated-harts = <0>;
+            dedicated-harts = <0 1>;
 
             entry = <0x100000>;
         };
