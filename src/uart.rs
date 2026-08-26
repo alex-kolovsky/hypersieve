@@ -1,4 +1,7 @@
-use core::ptr::{read_volatile, write_volatile};
+use core::{
+    fmt,
+    ptr::{read_volatile, write_volatile},
+};
 use spin::Mutex;
 
 pub const QEMU_UART_ADDR: u64 = 0x1000_0000;
@@ -9,8 +12,8 @@ pub struct Uart {
     base_addr: u64,
 }
 
-impl core::fmt::Write for Uart {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+impl fmt::Write for Uart {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {
             self.put(byte);
         }
@@ -76,7 +79,7 @@ macro_rules! println {
 }
 
 #[doc(hidden)]
-pub fn _print(args: core::fmt::Arguments) {
-    use core::fmt::Write;
+pub fn _print(args: fmt::Arguments) {
+    use fmt::Write;
     UART.lock().write_fmt(args).unwrap();
 }

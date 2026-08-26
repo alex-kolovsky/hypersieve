@@ -1,5 +1,5 @@
-use crate::{allocator::alloc_pages, guest_table::GuestPageTable, read_csr};
-use core::default::Default;
+use crate::read_csr;
+use core::{arch::naked_asm, default::Default, mem::offset_of};
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -112,7 +112,7 @@ impl Vcpu {
             vsatp: 0,
         }
     }
-    pub fn new(table: &GuestPageTable, guest_entry: u64) -> Self {
+    pub fn new(table: &crate::guest_table::GuestPageTable, guest_entry: u64) -> Self {
         // Set the XLEN for VS-mode (VSXL bitfield) to 64 bits in hstatus.
         let vsxl: u64 = 2 << 32;
         // Set Supervisor Previous Virtualization (SPV) to 1 so the sret instruction boots the CPU into virtual mode.
@@ -128,7 +128,7 @@ impl Vcpu {
         let sstatus: u64 = spp | vs; // sstatus: Supervisor Status
 
         let stack_size = 512 * 1024;
-        let host_sp: u64 = alloc_pages(stack_size) as u64 + stack_size as u64;
+        let host_sp: u64 = crate::allocator::alloc_pages(stack_size) as u64 + stack_size as u64;
 
         Self {
             hstatus,
@@ -162,8 +162,6 @@ impl Vcpu {
         unreachable!();
     }
 }
-
-use core::arch::naked_asm;
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, a0: u64) {
@@ -248,49 +246,49 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, 
 
         "sret",
 
-        hstatus_offset = const core::mem::offset_of!(Vcpu, hstatus),
-        sstatus_offset = const core::mem::offset_of!(Vcpu, sstatus),
-        hgatp_offset = const core::mem::offset_of!(Vcpu, hgatp),
-        sepc_offset = const core::mem::offset_of!(Vcpu, sepc),
-        vsstatus_offset = const core::mem::offset_of!(Vcpu, vsstatus),
+        hstatus_offset = const offset_of!(Vcpu, hstatus),
+        sstatus_offset = const offset_of!(Vcpu, sstatus),
+        hgatp_offset = const offset_of!(Vcpu, hgatp),
+        sepc_offset = const offset_of!(Vcpu, sepc),
+        vsstatus_offset = const offset_of!(Vcpu, vsstatus),
 
-        vstvec_offset = const core::mem::offset_of!(Vcpu, vstvec),
-        vsscratch_offset = const core::mem::offset_of!(Vcpu, vsscratch),
-        vsepc_offset = const core::mem::offset_of!(Vcpu, vsepc),
-        vscause_offset = const core::mem::offset_of!(Vcpu, vscause),
-        vstval_offset = const core::mem::offset_of!(Vcpu, vstval),
-        vsie_offset = const core::mem::offset_of!(Vcpu, vsie),
-        vsatp_offset = const core::mem::offset_of!(Vcpu, vsatp),
+        vstvec_offset = const offset_of!(Vcpu, vstvec),
+        vsscratch_offset = const offset_of!(Vcpu, vsscratch),
+        vsepc_offset = const offset_of!(Vcpu, vsepc),
+        vscause_offset = const offset_of!(Vcpu, vscause),
+        vstval_offset = const offset_of!(Vcpu, vstval),
+        vsie_offset = const offset_of!(Vcpu, vsie),
+        vsatp_offset = const offset_of!(Vcpu, vsatp),
 
-        ra_offset = const core::mem::offset_of!(Vcpu, ra),
-        sp_offset = const core::mem::offset_of!(Vcpu, sp),
-        gp_offset = const core::mem::offset_of!(Vcpu, gp),
-        tp_offset = const core::mem::offset_of!(Vcpu, tp),
-        t0_offset = const core::mem::offset_of!(Vcpu, t0),
-        t1_offset = const core::mem::offset_of!(Vcpu, t1),
-        t2_offset = const core::mem::offset_of!(Vcpu, t2),
-        s0_offset = const core::mem::offset_of!(Vcpu, s0),
-        s1_offset = const core::mem::offset_of!(Vcpu, s1),
-        a1_offset = const core::mem::offset_of!(Vcpu, a1),
-        a2_offset = const core::mem::offset_of!(Vcpu, a2),
-        a3_offset = const core::mem::offset_of!(Vcpu, a3),
-        a4_offset = const core::mem::offset_of!(Vcpu, a4),
-        a5_offset = const core::mem::offset_of!(Vcpu, a5),
-        a6_offset = const core::mem::offset_of!(Vcpu, a6),
-        a7_offset = const core::mem::offset_of!(Vcpu, a7),
-        s2_offset = const core::mem::offset_of!(Vcpu, s2),
-        s3_offset = const core::mem::offset_of!(Vcpu, s3),
-        s4_offset = const core::mem::offset_of!(Vcpu, s4),
-        s5_offset = const core::mem::offset_of!(Vcpu, s5),
-        s6_offset = const core::mem::offset_of!(Vcpu, s6),
-        s7_offset = const core::mem::offset_of!(Vcpu, s7),
-        s8_offset = const core::mem::offset_of!(Vcpu, s8),
-        s9_offset = const core::mem::offset_of!(Vcpu, s9),
-        s10_offset = const core::mem::offset_of!(Vcpu, s10),
-        s11_offset = const core::mem::offset_of!(Vcpu, s11),
-        t3_offset = const core::mem::offset_of!(Vcpu, t3),
-        t4_offset = const core::mem::offset_of!(Vcpu, t4),
-        t5_offset = const core::mem::offset_of!(Vcpu, t5),
-        t6_offset = const core::mem::offset_of!(Vcpu, t6),
+        ra_offset = const offset_of!(Vcpu, ra),
+        sp_offset = const offset_of!(Vcpu, sp),
+        gp_offset = const offset_of!(Vcpu, gp),
+        tp_offset = const offset_of!(Vcpu, tp),
+        t0_offset = const offset_of!(Vcpu, t0),
+        t1_offset = const offset_of!(Vcpu, t1),
+        t2_offset = const offset_of!(Vcpu, t2),
+        s0_offset = const offset_of!(Vcpu, s0),
+        s1_offset = const offset_of!(Vcpu, s1),
+        a1_offset = const offset_of!(Vcpu, a1),
+        a2_offset = const offset_of!(Vcpu, a2),
+        a3_offset = const offset_of!(Vcpu, a3),
+        a4_offset = const offset_of!(Vcpu, a4),
+        a5_offset = const offset_of!(Vcpu, a5),
+        a6_offset = const offset_of!(Vcpu, a6),
+        a7_offset = const offset_of!(Vcpu, a7),
+        s2_offset = const offset_of!(Vcpu, s2),
+        s3_offset = const offset_of!(Vcpu, s3),
+        s4_offset = const offset_of!(Vcpu, s4),
+        s5_offset = const offset_of!(Vcpu, s5),
+        s6_offset = const offset_of!(Vcpu, s6),
+        s7_offset = const offset_of!(Vcpu, s7),
+        s8_offset = const offset_of!(Vcpu, s8),
+        s9_offset = const offset_of!(Vcpu, s9),
+        s10_offset = const offset_of!(Vcpu, s10),
+        s11_offset = const offset_of!(Vcpu, s11),
+        t3_offset = const offset_of!(Vcpu, t3),
+        t4_offset = const offset_of!(Vcpu, t4),
+        t5_offset = const offset_of!(Vcpu, t5),
+        t6_offset = const offset_of!(Vcpu, t6),
     );
 }

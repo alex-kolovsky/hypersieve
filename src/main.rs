@@ -11,23 +11,19 @@ mod vcpu;
 
 extern crate alloc;
 
-use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART};
-use core::{
-    arch::{asm, global_asm},
-    panic::PanicInfo,
-};
+use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART, vcpu::Vcpu};
 
-global_asm!(include_str!("asm/boot.S"));
+core::arch::global_asm!(include_str!("asm/boot.S"));
 
 // Include file created by build scrip.
 include!(concat!(env!("OUT_DIR"), "/guests.rs"));
 
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("panic: {}", info);
     loop {
         unsafe {
-            asm!("wfi");
+            core::arch::asm!("wfi");
         }
     }
 }
@@ -41,18 +37,18 @@ pub extern "C" fn main(hart_id: usize) -> ! {
 
     // Fill the guests with VCPUs.
     for guest in GUESTS.iter() {
-        let vcpus: *mut [Option<crate::vcpu::Vcpu>; MAX_HARTS_CAP] = guest.vcpus.get();
+        let vcpus: *mut [Option<Vcpu>; MAX_HARTS_CAP] = guest.vcpus.get();
 
         for i in 0..guest.harts_cap {
             // Get the pointer to the first vCPU in guest.vcpus.
-            let base_ptr: *mut Option<vcpu::Vcpu> = vcpus as *mut Option<vcpu::Vcpu>;
+            let base_ptr: *mut Option<Vcpu> = vcpus as *mut Option<vcpu::Vcpu>;
 
             // Get the vcpu pointer by its ID.
-            let cur_vcpu: *mut Option<vcpu::Vcpu> = unsafe { base_ptr.add(i) };
+            let cur_vcpu: *mut Option<Vcpu> = unsafe { base_ptr.add(i) };
 
             unsafe {
                 if let Some(vcpu_ref) = &mut *cur_vcpu {
-                    let vcpu: *mut vcpu::Vcpu = vcpu_ref as *mut vcpu::Vcpu;
+                    let vcpu: *mut Vcpu = vcpu_ref as *mut Vcpu;
 
                     // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
                     *vcpu = guest::allocate_guest_memory(guest.entry_gpa, guest.data);

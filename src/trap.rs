@@ -1,7 +1,8 @@
-use crate::vcpu::Vcpu;
-use crate::{print, println};
-use core::arch::{asm, naked_asm};
-use core::mem::offset_of;
+use crate::{print, println, vcpu::Vcpu};
+use core::{
+    arch::{asm, naked_asm},
+    mem::offset_of,
+};
 const SXLEN: u8 = 64;
 
 #[macro_export]
@@ -106,15 +107,15 @@ pub extern "C" fn trap_handler() {
 
         scause_offset = const offset_of!(Vcpu, scause),
         sepc_offset = const offset_of!(Vcpu, sepc),
-        hstatus_offset = const core::mem::offset_of!(Vcpu, hstatus),
-        vsstatus_offset = const core::mem::offset_of!(Vcpu, vsstatus),
-        vstvec_offset = const core::mem::offset_of!(Vcpu, vstvec),
-        vsscratch_offset = const core::mem::offset_of!(Vcpu, vsscratch),
-        vsepc_offset = const core::mem::offset_of!(Vcpu, vsepc),
-        vscause_offset = const core::mem::offset_of!(Vcpu, vscause),
-        vstval_offset = const core::mem::offset_of!(Vcpu, vstval),
-        vsie_offset = const core::mem::offset_of!(Vcpu, vsie),
-        vsatp_offset = const core::mem::offset_of!(Vcpu, vsatp),
+        hstatus_offset = const offset_of!(Vcpu, hstatus),
+        vsstatus_offset = const offset_of!(Vcpu, vsstatus),
+        vstvec_offset = const offset_of!(Vcpu, vstvec),
+        vsscratch_offset = const offset_of!(Vcpu, vsscratch),
+        vsepc_offset = const offset_of!(Vcpu, vsepc),
+        vscause_offset = const offset_of!(Vcpu, vscause),
+        vstval_offset = const offset_of!(Vcpu, vstval),
+        vsie_offset = const offset_of!(Vcpu, vsie),
+        vsatp_offset = const offset_of!(Vcpu, vsatp),
         host_sp_offset = const offset_of!(Vcpu, host_sp),
 
         // GPRs

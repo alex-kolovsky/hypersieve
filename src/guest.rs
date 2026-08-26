@@ -1,14 +1,16 @@
-use crate::MAX_HARTS_CAP;
-use crate::allocator::alloc_pages;
-use crate::guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X};
+use crate::{
+    MAX_HARTS_CAP,
+    allocator::alloc_pages,
+    guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
+    vcpu::Vcpu,
+};
+use core::{cell::UnsafeCell, sync::atomic::AtomicPtr};
 
 #[derive(Debug)]
 pub struct Guest {
     pub entry_gpa: usize,
-    pub vcpu_ptrs: core::cell::UnsafeCell<
-        [Option<core::sync::atomic::AtomicPtr<crate::vcpu::Vcpu>>; MAX_HARTS_CAP],
-    >,
-    pub vcpus: core::cell::UnsafeCell<[Option<crate::vcpu::Vcpu>; crate::MAX_HARTS_CAP]>,
+    pub vcpu_ptrs: UnsafeCell<[Option<AtomicPtr<Vcpu>>; MAX_HARTS_CAP]>,
+    pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_HARTS_CAP]>,
     pub harts: core::sync::atomic::AtomicUsize,
     pub harts_cap: usize,
     pub data: &'static [u8],
@@ -18,7 +20,7 @@ pub struct Guest {
 unsafe impl Sync for Guest {}
 unsafe impl Send for Guest {}
 
-pub fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> crate::vcpu::Vcpu {
+pub fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> Vcpu {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
     unsafe {
@@ -35,5 +37,5 @@ pub fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> cr
         PTE_R | PTE_W | PTE_X,
     );
 
-    crate::vcpu::Vcpu::new(&table, guest_entry_gpa as u64)
+    Vcpu::new(&table, guest_entry_gpa as u64)
 }

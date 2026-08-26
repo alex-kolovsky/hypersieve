@@ -1,4 +1,7 @@
-use core::alloc::{GlobalAlloc, Layout};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    ptr::null_mut,
+};
 use spin::Mutex;
 
 unsafe extern "C" {
@@ -32,7 +35,7 @@ pub struct Heap<const ORDER: usize> {
 impl<const ORDER: usize> Heap<ORDER> {
     pub const fn empty() -> Self {
         Self {
-            free_list: [core::ptr::null_mut(); ORDER],
+            free_list: [null_mut(); ORDER],
             base_addr: 0x0,
         }
     }
@@ -61,7 +64,7 @@ impl<const ORDER: usize> Heap<ORDER> {
         if size < 8 {
             size = 8;
         }
-        let mut best_fit_node: *mut u8 = core::ptr::null_mut();
+        let mut best_fit_node: *mut u8 = null_mut();
         let best_fit_id = size.next_power_of_two().trailing_zeros() as usize;
 
         for found_node_index in best_fit_id..FREE_LIST_LENGTH {
@@ -71,7 +74,7 @@ impl<const ORDER: usize> Heap<ORDER> {
                 if !node.is_null() {
                     let splits = found_node_index - best_fit_id;
                     if splits > 0 {
-                        self.free_list[found_node_index] = core::ptr::null_mut();
+                        self.free_list[found_node_index] = null_mut();
                         for index in 1..=splits {
                             let size_of_node = (1 << found_node_index) >> (index);
                             let (next_node, second_addr) = split_node(node as usize, size_of_node);
@@ -82,7 +85,7 @@ impl<const ORDER: usize> Heap<ORDER> {
                             } else {
                                 unsafe {
                                     let target = buddy_ptr as *mut *mut u8;
-                                    *target = core::ptr::null_mut();
+                                    *target = null_mut();
                                 }
                             }
 
@@ -117,12 +120,12 @@ fn split_node(start_addr: usize, size: usize) -> (usize, usize) {
 }
 
 unsafe impl<const ORDER: usize> GlobalAlloc for BuddyAllocator<ORDER> {
-    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut heap = self.heap.lock();
 
         heap.allocate(layout.size())
     }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let buddy_size = layout.size().next_power_of_two();
         let mut best_fit_size: usize = if buddy_size < 8 { 8 } else { buddy_size };
         let mut best_fit_id: usize = best_fit_size.trailing_zeros() as usize;
