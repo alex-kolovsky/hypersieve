@@ -121,9 +121,8 @@ pub fn number_of_harts() -> usize {
 
 pub fn jump_in_guest(hart_id: usize) -> ! {
     for guest in crate::GUESTS.iter() {
-        let harts = guest.harts.load(Ordering::Acquire);
+        let harts = guest.harts.fetch_add(1, Ordering::Relaxed);
         if harts < guest.harts_cap {
-            guest.harts.store(harts + 1, Ordering::Release);
             unsafe {
                 let vcpu_ptr: *mut crate::vcpu::Vcpu =
                     (&mut *guest.vcpu_ptrs.get())[harts].unwrap();
