@@ -19,6 +19,7 @@ use core::{
 
 global_asm!(include_str!("asm/boot.S"));
 
+// Include file created by build scrip.
 include!(concat!(env!("OUT_DIR"), "/guests.rs"));
 
 #[panic_handler]
@@ -38,17 +39,32 @@ pub extern "C" fn main(hart_id: usize) -> ! {
 
     multihart::hart_configure();
 
-    // Fill GUESTS array with VCPUs.
+    // Fill the guests with VCPUs.
     for guest in GUESTS.iter() {
-        let vcpu_ptr: *mut crate::vcpu::Vcpu = guest.vcpu.get();
+        let vcpus: *mut [Option<crate::vcpu::Vcpu>; MAX_HARTS_CAP] = guest.vcpus.get();
 
-        unsafe {
-            *vcpu_ptr = guest::allocate_guest_memory(guest.entry_gpa, guest.data);
+        for i in 0..guest.harts_cap {
+            // Get the pointer to the first vCPU in guest.vcpus.
+            let base_ptr: *mut Option<vcpu::Vcpu> = vcpus as *mut Option<vcpu::Vcpu>;
+
+            // Get the vcpu pointer by its ID.
+            let cur_vcpu: *mut Option<vcpu::Vcpu> = unsafe { base_ptr.add(i) };
+
+            unsafe {
+                if let Some(vcpu_ref) = &mut *cur_vcpu {
+                    let vcpu: *mut vcpu::Vcpu = vcpu_ref as *mut vcpu::Vcpu;
+
+                    // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
+                    *vcpu = guest::allocate_guest_memory(guest.entry_gpa, guest.data);
+
+                    // Load this vcpu pointer into guest.vcpu_ptrs[i].
+                    let vcpu_ptr = guest.vcpu_ptrs.get();
+                    (*vcpu_ptr)[i] = Some(core::sync::atomic::AtomicPtr::new(vcpu));
+                } else {
+                    unreachable!();
+                }
+            }
         }
-
-        guest
-            .vcpu_ptr
-            .store(vcpu_ptr, core::sync::atomic::Ordering::Release);
     }
 
     // Start all other harts if available.

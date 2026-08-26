@@ -124,9 +124,11 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
                 .harts
                 .store(harts + 1, core::sync::atomic::Ordering::Release);
             unsafe {
-                let vcpu_ptr: *mut crate::vcpu::Vcpu =
-                    guest.vcpu_ptr.load(core::sync::atomic::Ordering::Acquire);
-                (*vcpu_ptr).run();
+                let vcpu_ptr: *mut crate::vcpu::Vcpu = (&mut *guest.vcpu_ptrs.get())[harts]
+                    .as_mut()
+                    .unwrap()
+                    .load(core::sync::atomic::Ordering::Acquire);
+                (*vcpu_ptr).very_fisrt_run(harts);
             }
         }
     }

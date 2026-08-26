@@ -8,7 +8,7 @@
         vm0 {
             path = "target/guest-1/guest-1.bin";
 
-            harts-cap = <1>;
+            harts-cap = <2>;
             dedicated-harts = <0>;
 
             entry = <0x100000>;
@@ -17,7 +17,7 @@
         vm1 {
             path = "target/guest-2/guest-2.bin";
 
-            harts-cap = <1>;
+            harts-cap = <2>;
 
             entry = <0x100000>;
         };

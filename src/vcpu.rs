@@ -145,7 +145,18 @@ impl Vcpu {
         let vstimecmp = time + 10_000;
 
         unsafe {
-            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
+            switch_to_guest(self as *mut Vcpu, vstimecmp as usize, self.a0);
+        }
+
+        unreachable!();
+    }
+    pub fn very_fisrt_run(&mut self, hart_id: usize) -> ! {
+        let time = read_csr!("time");
+        let vstimecmp = time + 10_000;
+
+        unsafe {
+            // Load the hart ID into a0 on the first run.
+            switch_to_guest(self as *mut Vcpu, vstimecmp as usize, hart_id as u64);
         }
 
         unreachable!();
@@ -155,7 +166,7 @@ impl Vcpu {
 use core::arch::naked_asm;
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) {
+pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, a0: u64) {
     naked_asm!(
         "mv t0, a0",
 
@@ -208,7 +219,7 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) 
         "ld s0, {s0_offset}(t0)",
         "ld s1, {s1_offset}(t0)",
 
-        "ld a0, {a0_offset}(t0)",
+        "mv a0, a2",
         "ld a1, {a1_offset}(t0)",
         "ld a2, {a2_offset}(t0)",
         "ld a3, {a3_offset}(t0)",
@@ -260,7 +271,6 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) 
         t2_offset = const core::mem::offset_of!(Vcpu, t2),
         s0_offset = const core::mem::offset_of!(Vcpu, s0),
         s1_offset = const core::mem::offset_of!(Vcpu, s1),
-        a0_offset = const core::mem::offset_of!(Vcpu, a0),
         a1_offset = const core::mem::offset_of!(Vcpu, a1),
         a2_offset = const core::mem::offset_of!(Vcpu, a2),
         a3_offset = const core::mem::offset_of!(Vcpu, a3),

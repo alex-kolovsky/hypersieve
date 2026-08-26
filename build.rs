@@ -40,8 +40,8 @@ fn main() {
         );
     }
 
-    let dtb_data = std::fs::read(dtb_output_path).unwrap();
     // Parse Device Tree Binary file.
+    let dtb_data = std::fs::read(dtb_output_path).unwrap();
     let mut max_harts_cap: usize = 0;
     let mut paths: Vec<&str> = Vec::new();
 
@@ -99,6 +99,18 @@ pub static GUESTS: [Guest; {}] = [
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
 
     for (i, guest) in guests.iter().enumerate() {
+        // Create guest.vcpus array.
+        let mut vcpus: String = String::from("[");
+        for vcpus_i in 0..max_harts_cap {
+            if vcpus_i < guest.harts_cap {
+                vcpus.push_str("Some(crate::vcpu::Vcpu::zeroed()), ");
+            } else {
+                vcpus.push_str("None, ");
+            }
+        }
+        vcpus.push(']');
+
+        // Add guest entry in GUESTS array.
         writeln!(
             f,
             "
@@ -107,8 +119,8 @@ Guest {{
     harts: core::sync::atomic::AtomicUsize::new(0),
     harts_cap: {},
     data: include_bytes!(\"{manifest_dir}/{}\"),
-    vcpu: core::cell::UnsafeCell::new(crate::vcpu::Vcpu::zeroed()),
-    vcpu_ptr: core::sync::atomic::AtomicPtr::new(core::ptr::null_mut()),
+    vcpus: core::cell::UnsafeCell::new({vcpus}),
+    vcpu_ptrs: core::cell::UnsafeCell::new([const {{ None }}; MAX_HARTS_CAP]),
 }},
             ",
             guest.entry_gpa, guest.harts_cap, paths[i]

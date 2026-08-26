@@ -1,16 +1,20 @@
+use crate::MAX_HARTS_CAP;
 use crate::allocator::alloc_pages;
 use crate::guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X};
 
 #[derive(Debug)]
 pub struct Guest {
     pub entry_gpa: usize,
-    pub vcpu_ptr: core::sync::atomic::AtomicPtr<crate::vcpu::Vcpu>,
-    pub vcpu: core::cell::UnsafeCell<crate::vcpu::Vcpu>,
+    pub vcpu_ptrs: core::cell::UnsafeCell<
+        [Option<core::sync::atomic::AtomicPtr<crate::vcpu::Vcpu>>; MAX_HARTS_CAP],
+    >,
+    pub vcpus: core::cell::UnsafeCell<[Option<crate::vcpu::Vcpu>; crate::MAX_HARTS_CAP]>,
     pub harts: core::sync::atomic::AtomicUsize,
     pub harts_cap: usize,
     pub data: &'static [u8],
 }
 
+// The Guest struct is thread-safe if we never change Option::None to Option::Some or vice versa after waking the harts up.
 unsafe impl Sync for Guest {}
 unsafe impl Send for Guest {}
 
