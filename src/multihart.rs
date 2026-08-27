@@ -125,6 +125,13 @@ pub fn number_of_harts() -> usize {
 }
 
 pub fn jump_in_guest(hart_id: usize) -> ! {
+    unsafe {
+        let first_dedicated_vcpu_ptr = (*crate::HARTS[hart_id].dedicated_to.get())[0];
+        if !(first_dedicated_vcpu_ptr).is_null() {
+            (*first_dedicated_vcpu_ptr).very_fisrt_run(hart_id);
+        }
+    }
+
     for guest in crate::GUESTS.iter() {
         let harts = guest.harts.fetch_add(1, Ordering::Relaxed);
         if harts < guest.harts_cap {
