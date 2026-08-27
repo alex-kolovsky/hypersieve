@@ -71,6 +71,8 @@ pub extern "C" fn main(hart_id: usize) -> ! {
                     for dedicated_id in 0..(*dedicated_ptr).len() {
                         if (*dedicated_ptr)[dedicated_id].is_null() {
                             (*dedicated_ptr)[dedicated_id] = (*guest.vcpu_ptrs.get())[i].unwrap();
+                            (*(*guest.vcpu_ptrs.get())[i].unwrap()).host_hart_id =
+                                (*hart_id) as usize;
                         }
                     }
                 }

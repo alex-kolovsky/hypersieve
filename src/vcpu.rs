@@ -1,10 +1,10 @@
-use crate::{multihart::Hart, read_csr};
+use crate::read_csr;
 use core::{arch::naked_asm, default::Default, mem::offset_of};
 
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct Vcpu {
-    pub host_hart: Hart,
+    pub host_hart_id: usize,
     // Host registers
     pub host_sp: u64,
     // General purpose registers
@@ -60,7 +60,7 @@ pub struct Vcpu {
 impl Vcpu {
     pub const fn zeroed() -> Self {
         Self {
-            host_hart: Hart::empty(),
+            host_hart_id: 0,
             // Host registers
             host_sp: 0,
             // General purpose registers
