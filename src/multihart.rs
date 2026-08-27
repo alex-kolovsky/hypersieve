@@ -2,21 +2,10 @@ use crate::{MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, rea
 use {core::arch::asm, core::sync::atomic::Ordering};
 
 #[derive(Debug, Default)]
+#[repr(transparent)]
 pub struct Hart {
-    pub hart_id: usize,
     pub dedicated_to:
         core::cell::UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
-}
-
-impl Hart {
-    pub const fn empty() -> Self {
-        Self {
-            hart_id: 0,
-            dedicated_to: core::cell::UnsafeCell::new(
-                [core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
-            ),
-        }
-    }
 }
 
 // The Hart struct is thread-safe if we never change dedicated_to field after waking the harts up.

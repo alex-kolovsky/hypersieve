@@ -229,15 +229,13 @@ static HARTS: [Hart; HARTS_CAP_SUM] = [
     )
     .unwrap();
 
-    for hart in all_harts {
+    for _hart in all_harts {
         writeln!(
             f,
             "
 Hart {{
-    hart_id: {},
     dedicated_to: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]),
 }},",
-            hart.hart_id,
         )
         .unwrap();
     }
