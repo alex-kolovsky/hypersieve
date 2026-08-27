@@ -18,7 +18,6 @@ impl Guest {
 #[derive(Debug, Default)]
 pub struct Hart {
     pub hart_id: usize,
-    pub dedicated_to: Option<Vec<Option<usize>>>,
 }
 
 fn main() {
@@ -150,19 +149,11 @@ fn main() {
 
     for hart_id in 0..harts_cap_sum {
         if let Some(dedicated_to) = already_dedicated_harts.get(&(hart_id as u32)) {
-            let mut entry: Hart = Hart {
-                hart_id,
-                dedicated_to: Some(dedicated_to.clone()),
-            };
-            for _ in 0..(max_supported_dedicated_guests_per_hart - dedicated_to.len()) {
-                entry.dedicated_to.as_mut().unwrap().push(None);
-            }
+            let entry: Hart = Hart { hart_id };
+            for _ in 0..(max_supported_dedicated_guests_per_hart - dedicated_to.len()) {}
             all_harts.push(entry);
         } else {
-            let entry = Hart {
-                hart_id,
-                dedicated_to: None,
-            };
+            let entry = Hart { hart_id };
             all_harts.push(entry);
         }
     }
@@ -233,7 +224,7 @@ pub static GUESTS: [Guest; {}] = [
     writeln!(
         f,
         "
-const HARTS: [Hart; HARTS_CAP_SUM] = [
+static HARTS: [Hart; HARTS_CAP_SUM] = [
 "
     )
     .unwrap();
@@ -244,19 +235,11 @@ const HARTS: [Hart; HARTS_CAP_SUM] = [
             "
 Hart {{
     hart_id: {},
-",
+    dedicated_to: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]),
+}},",
             hart.hart_id,
         )
         .unwrap();
-        if let Some(dedicated_to) = hart.dedicated_to {
-            writeln!(f, "    dedicated_to: Some([").unwrap();
-            for _ in dedicated_to {
-                writeln!(f, "        Some(core::ptr::null_mut()),").unwrap();
-            }
-            writeln!(f, "    ]),\n}},").unwrap();
-        } else {
-            writeln!(f, "    dedicated_to: None,\n}},").unwrap();
-        }
     }
 
     writeln!(f, "];").unwrap();

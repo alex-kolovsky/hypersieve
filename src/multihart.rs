@@ -5,28 +5,23 @@ use {core::arch::asm, core::sync::atomic::Ordering};
 pub struct Hart {
     pub hart_id: usize,
     pub dedicated_to:
-        Option<[Option<*mut crate::vcpu::Vcpu>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
+        core::cell::UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
 }
 
 impl Hart {
-    pub fn init(
-        &mut self,
-        dedicated_to: Option<
-            [Option<*mut crate::vcpu::Vcpu>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
-        >,
-        hart_id: usize,
-    ) {
-        self.dedicated_to = dedicated_to;
-        self.hart_id = hart_id;
-    }
-
     pub const fn empty() -> Self {
         Self {
             hart_id: 0,
-            dedicated_to: None,
+            dedicated_to: core::cell::UnsafeCell::new(
+                [core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
+            ),
         }
     }
 }
+
+// The Hart struct is thread-safe if we never change dedicated_to field after waking the harts up.
+unsafe impl Sync for Hart {}
+unsafe impl Send for Hart {}
 
 #[inline(always)]
 fn sbi_hart_start(hart_id: usize, start_addr: usize, opaque: usize) -> (isize, isize) {
