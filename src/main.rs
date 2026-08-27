@@ -61,6 +61,21 @@ pub extern "C" fn main(hart_id: usize) -> ! {
                 }
             }
         }
+
+        // Initialize dedicated Hart pointers before booting the secondary cores.
+        if let Some(dedicated_harts) = guest.dedicated_harts {
+            for (i, hart_id) in dedicated_harts.iter().enumerate() {
+                let dedicated_ptr = HARTS[*hart_id as usize].dedicated_to.get();
+
+                unsafe {
+                    for dedicated_id in 0..(*dedicated_ptr).len() {
+                        if (*dedicated_ptr)[dedicated_id].is_null() {
+                            (*dedicated_ptr)[dedicated_id] = (*guest.vcpu_ptrs.get())[i].unwrap();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Start all other harts if available.
