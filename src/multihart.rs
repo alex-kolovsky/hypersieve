@@ -1,10 +1,32 @@
-use crate::{allocator::alloc_pages, read_csr};
-use {
-    core::arch::asm,
-    core::sync::atomic::{AtomicUsize, Ordering},
-};
+use crate::{MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, read_csr};
+use {core::arch::asm, core::sync::atomic::Ordering};
 
-pub static HARTS_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[derive(Debug, Default)]
+pub struct Hart {
+    pub hart_id: usize,
+    pub dedicated_to:
+        Option<[Option<*mut crate::vcpu::Vcpu>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
+}
+
+impl Hart {
+    pub fn init(
+        &mut self,
+        dedicated_to: Option<
+            [Option<*mut crate::vcpu::Vcpu>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
+        >,
+        hart_id: usize,
+    ) {
+        self.dedicated_to = dedicated_to;
+        self.hart_id = hart_id;
+    }
+
+    pub const fn empty() -> Self {
+        Self {
+            hart_id: 0,
+            dedicated_to: None,
+        }
+    }
+}
 
 #[inline(always)]
 fn sbi_hart_start(hart_id: usize, start_addr: usize, opaque: usize) -> (isize, isize) {
@@ -74,7 +96,6 @@ pub fn hart_configure() {
 #[inline(always)]
 pub fn start_harts(main_hart_id: usize) {
     let harts_count = number_of_harts();
-    HARTS_COUNT.store(harts_count, Ordering::Release);
     let mut error_code: isize = 0;
     let mut value: isize = 0;
     let stack_size = 1024 * 1024;
