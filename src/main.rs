@@ -15,7 +15,7 @@ use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART, vcpu::Vcpu};
 
 core::arch::global_asm!(include_str!("asm/boot.S"));
 
-// Include file created by build scrip.
+// Include the file created by the build script.
 include!(concat!(env!("OUT_DIR"), "/guests.rs"));
 
 #[panic_handler]
@@ -67,12 +67,16 @@ pub extern "C" fn main(hart_id: usize) -> ! {
             for (i, hart_id) in dedicated_harts.iter().enumerate() {
                 let dedicated_ptr = HARTS[*hart_id as usize].dedicated_to.get();
 
+                let vcpu_ptrs = guest.vcpu_ptrs.get();
                 unsafe {
-                    for dedicated_id in 0..(*dedicated_ptr).len() {
-                        if (*dedicated_ptr)[dedicated_id].is_null() {
-                            (*dedicated_ptr)[dedicated_id] = (*guest.vcpu_ptrs.get())[i].unwrap();
-                            (*(*guest.vcpu_ptrs.get())[i].unwrap()).host_hart_id =
-                                (*hart_id) as usize;
+                    for id in 0..(*dedicated_ptr).len() {
+                        if (*dedicated_ptr)[id].is_null() {
+                            // First values of the vcpu_ptrs array are intended for dedicated harts.
+                            (*dedicated_ptr)[id] = (*vcpu_ptrs)[0].unwrap();
+
+                            // Remove the vcpu pointer of a dedicated hart from the vcpu_ptrs array.
+                            (*vcpu_ptrs)[i] = None;
+                            (*vcpu_ptrs).rotate_left(1);
                         }
                     }
                 }
