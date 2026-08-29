@@ -23,7 +23,11 @@ pub struct Guest {
 unsafe impl Sync for Guest {}
 unsafe impl Send for Guest {}
 
-pub fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> Vcpu {
+pub fn allocate_guest_memory(
+    guest_entry_gpa: usize,
+    image: &'static [u8],
+    virtual_hart_id: u64,
+) -> Vcpu {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
     unsafe {
@@ -40,5 +44,5 @@ pub fn allocate_guest_memory(guest_entry_gpa: usize, image: &'static [u8]) -> Vc
         PTE_R | PTE_W | PTE_X,
     );
 
-    Vcpu::new(&table, guest_entry_gpa as u64)
+    Vcpu::new(&table, guest_entry_gpa as u64, virtual_hart_id)
 }

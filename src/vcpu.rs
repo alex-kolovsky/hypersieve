@@ -117,7 +117,11 @@ impl Vcpu {
             vstimecmp: 0,
         }
     }
-    pub fn new(table: &crate::guest_table::GuestPageTable, guest_entry: u64) -> Self {
+    pub fn new(
+        table: &crate::guest_table::GuestPageTable,
+        guest_entry: u64,
+        virtual_hart_id: u64,
+    ) -> Self {
         // Set the XLEN for VS-mode (VSXL bitfield) to 64 bits in hstatus.
         let vsxl: u64 = 2 << 32;
         // Set Supervisor Previous Virtualization (SPV) to 1 so the sret instruction boots the CPU into virtual mode.
@@ -142,6 +146,7 @@ impl Vcpu {
             sepc: guest_entry,
             host_sp,
             vsstatus,
+            a0: virtual_hart_id,
             ..Default::default()
         }
     }
@@ -150,18 +155,19 @@ impl Vcpu {
         let vstimecmp = time + TIMER_OFFSET;
 
         unsafe {
-            switch_to_guest(self as *mut Vcpu, vstimecmp as usize, self.a0);
+            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
         }
 
         unreachable!();
     }
     pub fn very_fisrt_run(&mut self, hart_id: usize) -> ! {
+        self.host_hart_id = hart_id;
         let time = read_csr!("time");
         let vstimecmp = time + 10_000;
 
         unsafe {
             // Load the hart ID into a0 on the first run.
-            switch_to_guest(self as *mut Vcpu, vstimecmp as usize, hart_id as u64);
+            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
         }
 
         unreachable!();
@@ -169,7 +175,7 @@ impl Vcpu {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, a0: u64) {
+pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) {
     naked_asm!(
         "mv t0, a0",
 
@@ -222,7 +228,7 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, 
         "ld s0, {s0_offset}(t0)",
         "ld s1, {s1_offset}(t0)",
 
-        "mv a0, a2",
+        "ld a0, {a0_offset}(t0)",
         "ld a1, {a1_offset}(t0)",
         "ld a2, {a2_offset}(t0)",
         "ld a3, {a3_offset}(t0)",
@@ -274,6 +280,7 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize, 
         t2_offset = const offset_of!(Vcpu, t2),
         s0_offset = const offset_of!(Vcpu, s0),
         s1_offset = const offset_of!(Vcpu, s1),
+        a0_offset = const offset_of!(Vcpu, a0),
         a1_offset = const offset_of!(Vcpu, a1),
         a2_offset = const offset_of!(Vcpu, a2),
         a3_offset = const offset_of!(Vcpu, a3),

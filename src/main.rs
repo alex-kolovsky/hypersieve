@@ -51,7 +51,7 @@ pub extern "C" fn main(hart_id: usize) -> ! {
                     let vcpu: *mut Vcpu = vcpu_ref as *mut Vcpu;
 
                     // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
-                    *vcpu = guest::allocate_guest_memory(guest.entry_gpa, guest.data);
+                    *vcpu = guest::allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
 
                     // Load this vcpu pointer into guest.vcpu_ptrs[i].
                     let mut vcpu_ptr = guest.vcpu_ptrs.lock();
