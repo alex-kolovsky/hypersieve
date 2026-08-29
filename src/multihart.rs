@@ -2,7 +2,6 @@ use crate::{MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, rea
 use {core::arch::asm, core::sync::atomic::Ordering};
 
 #[derive(Debug, Default)]
-#[repr(transparent)]
 pub struct Hart {
     pub dedicated_to:
         core::cell::UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
@@ -133,11 +132,11 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     }
 
     for guest in crate::GUESTS.iter() {
-        let harts = guest.harts.fetch_add(1, Ordering::Relaxed);
+        let harts = guest.active_hart_count.fetch_add(1, Ordering::Relaxed);
         if harts < guest.harts_cap {
             unsafe {
                 let vcpu_ptr: *mut crate::vcpu::Vcpu =
-                    (&mut *guest.vcpu_ptrs.get())[harts].unwrap();
+                    (&mut *guest.vcpu_ptrs.lock())[harts].unwrap();
                 (*vcpu_ptr).very_fisrt_run(harts);
             }
         }

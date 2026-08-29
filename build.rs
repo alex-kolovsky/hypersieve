@@ -3,10 +3,10 @@ use std::{collections::HashMap, io::Write};
 struct Guest {
     entry_gpa: usize,
     harts_cap: usize,
-    dedicated_harts: Option<Vec<u32>>,
+    dedicated_harts: Vec<Option<u32>>,
 }
 impl Guest {
-    fn new(entry_gpa: usize, harts_cap: usize, dedicated_harts: Option<Vec<u32>>) -> Self {
+    fn new(entry_gpa: usize, harts_cap: usize, dedicated_harts: Vec<Option<u32>>) -> Self {
         Self {
             entry_gpa,
             harts_cap,
@@ -18,6 +18,7 @@ impl Guest {
 #[derive(Debug, Default)]
 pub struct Hart {
     pub hart_id: usize,
+    pub guests: Vec<Option<usize>>,
 }
 
 fn main() {
@@ -106,7 +107,7 @@ fn main() {
 
                 for bytes in chunks.iter() {
                     let hart_id: u32 = u32::from_be_bytes(*bytes);
-                    harts.push(hart_id);
+                    harts.push(Some(hart_id));
                 }
                 if harts.len() > harts_cap {
                     panic!(
@@ -123,17 +124,19 @@ fn main() {
 
                 // Increment the dedication counter for each assigned hart.
                 for hart in &harts {
-                    if let Some(already_dedicated_hart) = already_dedicated_harts.get_mut(hart) {
+                    if let Some(already_dedicated_hart) =
+                        already_dedicated_harts.get_mut(&hart.unwrap())
+                    {
                         already_dedicated_hart.push(Some(guest_index));
                     } else {
-                        already_dedicated_harts.insert(*hart, vec![Some(guest_index)]);
+                        already_dedicated_harts.insert(hart.unwrap(), vec![Some(guest_index)]);
                     }
                 }
 
-                let guest_entry = Guest::new(entry, harts_cap, Some(harts));
+                let guest_entry = Guest::new(entry, harts_cap, harts);
                 guests.push(guest_entry);
             } else {
-                let guest_entry = Guest::new(entry, harts_cap, None);
+                let guest_entry = Guest::new(entry, harts_cap, Vec::new());
                 guests.push(guest_entry);
             }
         }
@@ -149,11 +152,17 @@ fn main() {
 
     for hart_id in 0..harts_cap_sum {
         if let Some(dedicated_to) = already_dedicated_harts.get(&(hart_id as u32)) {
-            let entry: Hart = Hart { hart_id };
+            let entry: Hart = Hart {
+                hart_id,
+                guests: Vec::new(),
+            };
             for _ in 0..(max_supported_dedicated_guests_per_hart - dedicated_to.len()) {}
             all_harts.push(entry);
         } else {
-            let entry = Hart { hart_id };
+            let entry = Hart {
+                hart_id,
+                guests: Vec::new(),
+            };
             all_harts.push(entry);
         }
     }
@@ -181,7 +190,7 @@ pub static GUESTS: [Guest; {}] = [
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    for (i, guest) in guests.iter().enumerate() {
+    for (i, guest) in guests.iter_mut().enumerate() {
         // Create guest.vcpus array.
         let mut vcpus: String = String::from("[");
         for vcpus_i in 0..max_supported_harts_per_guest {
@@ -193,28 +202,36 @@ pub static GUESTS: [Guest; {}] = [
         }
         vcpus.push(']');
 
-        let dedicated_harts_count: usize =
-            if let Some(dedicated_harts) = guest.dedicated_harts.as_ref() {
-                dedicated_harts.len()
-            } else {
-                0
-            };
+        let mut dedicated_harts_count: usize = 0;
+        for hart in guest.dedicated_harts.iter().flatten() {
+            all_harts[*hart as usize].guests.push(Some(i));
+            dedicated_harts_count += 1;
+        }
+
+        while guest.dedicated_harts.len() < max_supported_dedicated_harts_per_guest {
+            guest.dedicated_harts.push(None);
+        }
 
         // Add guest entry in GUESTS array.
         writeln!(
             f,
             "Guest {{
     entry_gpa: {},
-    harts: core::sync::atomic::AtomicUsize::new({dedicated_harts_count}),
+    active_hart_count: core::sync::atomic::AtomicUsize::new(0),
+    active_dedicated_hart_count: core::sync::atomic::AtomicUsize::new(0),
     harts_cap: {},
+    dedicated_harts_cap: {dedicated_harts_count},
     dedicated_harts: {:#?},
     data: include_bytes!(\"{manifest_dir}/{}\"),
     vcpus: core::cell::UnsafeCell::new({vcpus}),
-    vcpu_ptrs: core::cell::UnsafeCell::new([const {{ None }}; MAX_SUPPORTED_HARTS_PER_GUEST]),
+    vcpu_ptrs: spin::Mutex::new([const {{ None }}; MAX_SUPPORTED_HARTS_PER_GUEST]),
 }},
 
 ",
-            guest.entry_gpa, guest.harts_cap, guest.dedicated_harts, paths[i]
+            guest.entry_gpa,
+            guest.harts_cap - dedicated_harts_count,
+            guest.dedicated_harts,
+            paths[i]
         )
         .unwrap();
     }
