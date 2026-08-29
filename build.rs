@@ -246,15 +246,22 @@ static HARTS: [Hart; HARTS_CAP_SUM] = [
     )
     .unwrap();
 
-    for _hart in all_harts {
+    for hart in all_harts {
         writeln!(
             f,
             "
 Hart {{
     dedicated_to: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]),
-}},",
+    guests: ["
         )
         .unwrap();
+        for guest_id in &hart.guests {
+            writeln!(f, "{guest_id:#?},").unwrap();
+        }
+        for _ in 0..(max_supported_dedicated_guests_per_hart - hart.guests.len()) {
+            writeln!(f, "None,").unwrap();
+        }
+        writeln!(f, "]}},").unwrap();
     }
 
     writeln!(f, "];").unwrap();

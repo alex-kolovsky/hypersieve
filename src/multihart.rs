@@ -1,10 +1,13 @@
-use crate::{MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, read_csr};
-use {core::arch::asm, core::sync::atomic::Ordering};
+use crate::{
+    GUESTS, HARTS, MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, read_csr,
+};
+use core::arch::asm;
 
 #[derive(Debug, Default)]
 pub struct Hart {
     pub dedicated_to:
         core::cell::UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
+    pub guests: [Option<usize>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
 }
 
 // The Hart struct is thread-safe if we never change dedicated_to field after waking the harts up.
@@ -124,23 +127,53 @@ pub fn number_of_harts() -> usize {
 }
 
 pub fn jump_in_guest(hart_id: usize) -> ! {
-    unsafe {
-        let first_dedicated_vcpu_ptr = (*crate::HARTS[hart_id].dedicated_to.get())[0];
-        if !(first_dedicated_vcpu_ptr).is_null() {
-            (*first_dedicated_vcpu_ptr).very_fisrt_run(hart_id);
-        }
+    if HARTS.len() <= hart_id {
+        panic!("Excess hart, hart id: {hart_id}");
     }
+    // Determine if a hart is dedicated. The dedicated_to
+    // field must contain at least one non-null pointer.
+    if unsafe { *(crate::HARTS[hart_id].dedicated_to.get()) }
+        .first()
+        .filter(|ptr| !ptr.is_null())
+        .is_some()
+    {
+        // Run a guest on a dedicated hart.
 
-    for guest in crate::GUESTS.iter() {
-        let harts = guest.active_hart_count.fetch_add(1, Ordering::Relaxed);
-        if harts < guest.harts_cap {
+        // Extract the guests for which this hart is dedicated.
+        let hart = &crate::HARTS[hart_id];
+        let guests = hart.guests;
+
+        for (guest_id_in_dedicated_to, guest_id) in guests.iter().enumerate() {
+            if let Some(guest_id) = guest_id {
+                // Check if a guest is free. A guest is free if the dedicated hart count
+                // is less than the active dedicated hart count.
+                let is_free = crate::guest::assign_dedicated_vcpu_if_available(*guest_id);
+
+                // Run a guest if it is free.
+                if is_free.is_ok() {
+                    unsafe {
+                        let vcpu_ptr = (*hart.dedicated_to.get())[guest_id_in_dedicated_to];
+                        (*vcpu_ptr).very_fisrt_run(hart_id);
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    } else {
+        // Run a guest on a non-dedicated hart.
+        for global_guest_id in 0..GUESTS.len() {
             unsafe {
-                let vcpu_ptr: *mut crate::vcpu::Vcpu =
-                    (&mut *guest.vcpu_ptrs.lock())[harts].unwrap();
-                (*vcpu_ptr).very_fisrt_run(harts);
+                let vcpu_ptr = crate::guest::assign_vcpu_if_available(global_guest_id);
+                // Run a guest if it is free; otherwise, continue searching for a free guest.
+                if let Ok(vcpu_ptr) = vcpu_ptr {
+                    // Fill the guest ID field with the guest's position in the GUESTS static array.
+                    (*vcpu_ptr).very_fisrt_run(hart_id);
+                }
             }
         }
     }
 
-    panic!("Excess hart, hart id: {hart_id}");
+    // A hart is excess if there are no free guests for it.
+    panic!("Couldn't find a job for a hart, hart id: {hart_id}");
 }
