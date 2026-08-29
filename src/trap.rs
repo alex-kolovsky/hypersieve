@@ -93,6 +93,9 @@ pub extern "C" fn trap_handler() {
         "csrr t0, vsatp",
         "sd t0, {vsatp_offset}(a0)",
 
+        "csrr t0, vstimecmp",
+        "sd t0, {vstimecmp_offset}(a0)",
+
         // Restore a0 from sscratch, and save in to VCpu.
         "csrr t0, sscratch",
         "sd t0, {a0_offset}(a0)",
@@ -116,6 +119,7 @@ pub extern "C" fn trap_handler() {
         vstval_offset = const offset_of!(Vcpu, vstval),
         vsie_offset = const offset_of!(Vcpu, vsie),
         vsatp_offset = const offset_of!(Vcpu, vsatp),
+        vstimecmp_offset = const offset_of!(Vcpu, vstimecmp),
         host_sp_offset = const offset_of!(Vcpu, host_sp),
 
         // GPRs

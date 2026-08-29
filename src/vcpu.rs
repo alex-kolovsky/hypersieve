@@ -1,3 +1,4 @@
+const TIMER_OFFSET: u64 = 10_000;
 use crate::read_csr;
 use core::{arch::naked_asm, default::Default, mem::offset_of};
 
@@ -56,6 +57,7 @@ pub struct Vcpu {
     pub vstval: u64,
     pub vsie: u64,
     pub vsatp: u64,
+    pub vstimecmp: u64,
 }
 impl Vcpu {
     pub const fn zeroed() -> Self {
@@ -112,6 +114,7 @@ impl Vcpu {
             vstval: 0,
             vsie: 0,
             vsatp: 0,
+            vstimecmp: 0,
         }
     }
     pub fn new(table: &crate::guest_table::GuestPageTable, guest_entry: u64) -> Self {
@@ -144,7 +147,7 @@ impl Vcpu {
     }
     pub fn run(&mut self) -> ! {
         let time = read_csr!("time");
-        let vstimecmp = time + 10_000;
+        let vstimecmp = time + TIMER_OFFSET;
 
         unsafe {
             switch_to_guest(self as *mut Vcpu, vstimecmp as usize, self.a0);
