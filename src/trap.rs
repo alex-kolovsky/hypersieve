@@ -211,7 +211,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
 
     if exception_code == 6 && interrupt_bit == 1 {
         unsafe {
-            (*vcpu).run();
+            (*vcpu).run_next_guest();
         }
     } else if exception_code == 10 && interrupt_bit == 0 {
         unsafe {
@@ -241,10 +241,11 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         }
     } else {
         println!(
-            "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nvsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
+            "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
             scause_str,
             interrupt_bit,
             exception_code,
+            unsafe { (*vcpu).host_hart_id },
             read_csr!("vsstatus"),
             read_csr!("sstatus"),
             read_csr!("sepc"),

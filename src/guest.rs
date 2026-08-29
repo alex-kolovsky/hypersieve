@@ -4,16 +4,18 @@ use crate::{
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
     vcpu::Vcpu,
 };
-
-use core::{cell::UnsafeCell, sync::atomic::Ordering};
+use core::{
+    cell::UnsafeCell,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 #[derive(Debug)]
 pub struct Guest {
     pub entry_gpa: usize,
     pub vcpu_ptrs: spin::Mutex<[Option<*mut Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
-    pub active_hart_count: core::sync::atomic::AtomicUsize,
-    pub active_dedicated_hart_count: core::sync::atomic::AtomicUsize,
+    pub active_hart_count: AtomicUsize,
+    pub active_dedicated_hart_count: AtomicUsize,
     pub harts_cap: usize,
     pub dedicated_harts_cap: usize,
     pub dedicated_harts: [Option<u32>; MAX_SUPPORTED_DEDICATED_HARTS_PER_GUEST],

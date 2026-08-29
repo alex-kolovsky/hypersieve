@@ -1,11 +1,13 @@
-const TIMER_OFFSET: u64 = 10_000;
-use crate::read_csr;
-use core::{arch::naked_asm, default::Default, mem::offset_of};
+pub const TIMER_OFFSET: u64 = 10_000;
+
+use crate::{GUESTS, read_csr};
+use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
 
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct Vcpu {
     pub host_hart_id: usize,
+    pub guest_id_for_hart: usize,
     // Host registers
     pub host_sp: u64,
     // General purpose registers
@@ -63,6 +65,7 @@ impl Vcpu {
     pub const fn zeroed() -> Self {
         Self {
             host_hart_id: 0,
+            guest_id_for_hart: 0,
             // Host registers
             host_sp: 0,
             // General purpose registers
@@ -150,24 +153,117 @@ impl Vcpu {
             ..Default::default()
         }
     }
-    pub fn run(&mut self) -> ! {
-        let time = read_csr!("time");
-        let vstimecmp = time + TIMER_OFFSET;
+    pub fn run_next_guest(&mut self) {
+        // Save these values before releasing this vcpu
+        // to other harts to prevent data races.
+        let host_sp = self.host_sp;
+        let guest_id_for_hart = self.guest_id_for_hart;
+        let host_hart_id = self.host_hart_id;
+
+        let dedicated_to = crate::HARTS[host_hart_id].dedicated_to.get();
+
+        // Determine if a hart is dedicated. The dedicated_to
+        // field must contain at least one non-null element.
+        let is_dedicated = unsafe {
+            (*dedicated_to)
+                .first()
+                .filter(|ptr| !ptr.is_null())
+                .is_some()
+        };
+
+        let mut guest_id = guest_id_for_hart;
+
+        if is_dedicated {
+            // Update the global active dedicated hart counter.
+            GUESTS[crate::HARTS[host_hart_id].guests[guest_id].unwrap()]
+                .active_dedicated_hart_count
+                .fetch_sub(1, Ordering::Acquire);
+        } else {
+            // If a hart is not dedicated, release this vcpu.
+            let mut vcpu_ptrs = GUESTS[guest_id].vcpu_ptrs.lock();
+            for vcpu_ptr in (*vcpu_ptrs).iter_mut() {
+                if vcpu_ptr.is_none() {
+                    *vcpu_ptr = Some(self as *mut Vcpu);
+                    break;
+                }
+            }
+
+            // Update the global active hart counter.
+            GUESTS[guest_id]
+                .active_hart_count
+                .fetch_sub(1, Ordering::Acquire);
+        }
+
+        // Increment the current guest ID to start from the next guest immediately.
+        guest_id += 1;
+
+        let next_guest: *mut Vcpu;
 
         unsafe {
-            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
+            loop {
+                let vcpu_ptr: Result<*mut Vcpu, ()>;
+                if is_dedicated {
+                    let hart = &crate::HARTS[self.host_hart_id];
+                    if hart.guests.len() <= guest_id {
+                        guest_id = 0;
+                    }
+                    if crate::guest::assign_dedicated_vcpu_if_available(
+                        hart.guests[guest_id].unwrap(),
+                    )
+                    .is_ok()
+                    {
+                        vcpu_ptr = Ok((*hart.dedicated_to.get())[guest_id]);
+                    } else {
+                        vcpu_ptr = Err(());
+                    }
+                } else {
+                    if GUESTS.len() <= guest_id {
+                        guest_id = 0;
+                    }
+                    vcpu_ptr = crate::guest::assign_vcpu_if_available(guest_id);
+                }
+
+                // Run a guest if it is free; otherwise, continue searching for a free guest.
+                if let Ok(vcpu_ptr) = vcpu_ptr {
+                    next_guest = vcpu_ptr;
+                    // Fill the new vcpu with correct values for this hart.
+                    (*next_guest).guest_id_for_hart = guest_id;
+                    (*next_guest).host_hart_id = host_hart_id;
+                    (*next_guest).host_sp = host_sp;
+
+                    break;
+                } else {
+                    guest_id += 1;
+                }
+            }
+        }
+
+        let vstimecmp = read_csr!("time") + TIMER_OFFSET;
+
+        unsafe {
+            switch_to_guest(next_guest, vstimecmp);
         }
 
         unreachable!();
     }
-    pub fn very_fisrt_run(&mut self, hart_id: usize) -> ! {
-        self.host_hart_id = hart_id;
+
+    pub fn run(&mut self) -> ! {
+        unsafe {
+            switch_to_guest(self as *mut Vcpu, self.vstimecmp);
+        }
+
+        unreachable!();
+    }
+    pub fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
         let time = read_csr!("time");
-        let vstimecmp = time + 10_000;
+        let vstimecmp = time + TIMER_OFFSET;
+
+        self.guest_id_for_hart = guest_id_for_hart;
+        self.host_hart_id = host_hart_id;
 
         unsafe {
             // Load the hart ID into a0 on the first run.
-            switch_to_guest(self as *mut Vcpu, vstimecmp as usize);
+            switch_to_guest(self as *mut Vcpu, vstimecmp);
         }
 
         unreachable!();
@@ -175,7 +271,7 @@ impl Vcpu {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: usize) {
+pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
     naked_asm!(
         "mv t0, a0",
 

@@ -1,12 +1,11 @@
 use crate::{
     GUESTS, HARTS, MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, read_csr,
 };
-use core::arch::asm;
+use core::{arch::asm, cell::UnsafeCell};
 
 #[derive(Debug, Default)]
 pub struct Hart {
-    pub dedicated_to:
-        core::cell::UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
+    pub dedicated_to: UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
     pub guests: [Option<usize>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
 }
 
@@ -38,9 +37,9 @@ fn sbi_hart_start(hart_id: usize, start_addr: usize, opaque: usize) -> (isize, i
 #[unsafe(naked)]
 pub extern "C" fn hart_entry() {
     core::arch::naked_asm!(
-        // Load stack pointer.
+        // Load the stack pointer.
         "mv sp, a1",
-        // Load trap handler function address.
+        // Load the trap handler function address.
         "la t0, trap_handler",
         "csrw stvec, t0",
         "j hart_init",
@@ -88,9 +87,9 @@ pub fn start_harts(main_hart_id: usize) {
     let mut sp: *mut u8;
 
     for hart_id in 0..harts_count {
-        // Skip main hart.
+        // Skip the main hart.
         if hart_id != main_hart_id {
-            // Allocate stack for hart.
+            // Allocate a stack for a hart.
             sp = alloc_pages(stack_size);
             let sp_end = (sp as usize) + stack_size;
             (error_code, value) = sbi_hart_start(hart_id, hart_entry as *const () as usize, sp_end);
@@ -153,7 +152,7 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
                 if is_free.is_ok() {
                     unsafe {
                         let vcpu_ptr = (*hart.dedicated_to.get())[guest_id_in_dedicated_to];
-                        (*vcpu_ptr).very_fisrt_run(hart_id);
+                        (*vcpu_ptr).very_fisrt_run(hart_id, guest_id_in_dedicated_to);
                     }
                 }
             } else {
@@ -168,7 +167,7 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
                 // Run a guest if it is free; otherwise, continue searching for a free guest.
                 if let Ok(vcpu_ptr) = vcpu_ptr {
                     // Fill the guest ID field with the guest's position in the GUESTS static array.
-                    (*vcpu_ptr).very_fisrt_run(hart_id);
+                    (*vcpu_ptr).very_fisrt_run(hart_id, global_guest_id);
                 }
             }
         }
