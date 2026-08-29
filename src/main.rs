@@ -39,7 +39,7 @@ pub extern "C" fn main(hart_id: usize) -> ! {
     for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
-        for i in 0..(guest.harts_cap + guest.dedicated_harts_cap) {
+        for i in 0..(guest.harts_cap + guest.assigned_harts_cap) {
             // Get the pointer to the first vCPU in guest.vcpus.
             let base_ptr: *mut Option<Vcpu> = vcpus as *mut Option<vcpu::Vcpu>;
 
@@ -62,18 +62,18 @@ pub extern "C" fn main(hart_id: usize) -> ! {
             }
         }
 
-        // Initialize dedicated Hart pointers before booting the secondary cores.
-        for dedicated_hart_id in guest.dedicated_harts.iter().flatten() {
-            let dedicated_to = HARTS[*dedicated_hart_id as usize].dedicated_to.get();
+        // Initialize assigned hart pointers before booting the secondary cores.
+        for assigned_hart_id in guest.assigned_harts.iter().flatten() {
+            let assigned_guests = HARTS[*assigned_hart_id as usize].assigned_guests.get();
 
             let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
             unsafe {
-                for id in 0..(*dedicated_to).len() {
-                    if (*dedicated_to)[id].is_null() {
-                        // First values of the vcpu_ptrs array are intended for dedicated harts.
-                        (*dedicated_to)[id] = (*vcpu_ptrs)[0].unwrap();
+                for id in 0..(*assigned_guests).len() {
+                    if (*assigned_guests)[id].is_null() {
+                        // First values of the vcpu_ptrs array are intended for assigned harts.
+                        (*assigned_guests)[id] = (*vcpu_ptrs)[0].unwrap();
 
-                        // Remove the vcpu pointer of a dedicated hart from the vcpu_ptrs array.
+                        // Remove the vcpu pointer of a assigned hart from the vcpu_ptrs array.
                         (*vcpu_ptrs)[0] = None;
                         (*vcpu_ptrs).rotate_left(1);
                     }

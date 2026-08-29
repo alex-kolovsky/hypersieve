@@ -1,15 +1,16 @@
 use crate::{
-    GUESTS, HARTS, MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART, allocator::alloc_pages, read_csr,
+    GUESTS, HARTS, MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART, allocator::alloc_pages, read_csr,
 };
 use core::{arch::asm, cell::UnsafeCell};
 
 #[derive(Debug, Default)]
 pub struct Hart {
-    pub dedicated_to: UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]>,
-    pub guests: [Option<usize>; MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART],
+    pub assigned_guests:
+        UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]>,
+    pub guests: [Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
 }
 
-// The Hart struct is thread-safe if we never change dedicated_to field after waking the harts up.
+// The Hart struct is thread-safe if we never change assigned_guests field after waking the harts up.
 unsafe impl Sync for Hart {}
 unsafe impl Send for Hart {}
 
@@ -129,24 +130,24 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     if HARTS.len() <= hart_id {
         panic!("Excess hart, hart id: {hart_id}");
     }
-    if is_hart_dedicated(hart_id) {
-        // Run a guest on a dedicated hart.
+    if is_hart_assigned(hart_id) {
+        // Run a guest on an assigned hart.
 
-        // Extract the guests for which this hart is dedicated.
+        // Extract the guests for which this hart is assigned.
         let hart = &crate::HARTS[hart_id];
         let guests = hart.guests;
 
-        for (guest_id_in_dedicated_to, guest_id) in guests.iter().enumerate() {
-            if let Some(guest_id) = guest_id {
-                // Check if a guest is free. A guest is free if the dedicated hart count
-                // is less than the active dedicated hart count.
-                let is_free = crate::guest::assign_dedicated_vcpu_if_available(*guest_id);
+        for (local_guest_id, global_guest_id) in guests.iter().enumerate() {
+            if let Some(global_guest_id) = global_guest_id {
+                // Check if a guest is free. A guest is free if the assigned hart count
+                // is less than the active assigned hart count.
+                let is_free = crate::guest::claim_assigned_hart_slot_if_available(*global_guest_id);
 
                 // Run a guest if it is free.
                 if is_free.is_ok() {
                     unsafe {
-                        let vcpu_ptr = (*hart.dedicated_to.get())[guest_id_in_dedicated_to];
-                        (*vcpu_ptr).very_fisrt_run(hart_id, guest_id_in_dedicated_to);
+                        let vcpu_ptr = (*hart.assigned_guests.get())[local_guest_id];
+                        (*vcpu_ptr).very_fisrt_run(hart_id, local_guest_id);
                     }
                 }
             } else {
@@ -154,10 +155,10 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
             }
         }
     } else {
-        // Run a guest on a non-dedicated hart.
+        // Run a guest on a non-assigned hart.
         for global_guest_id in 0..GUESTS.len() {
             unsafe {
-                let vcpu_ptr = crate::guest::assign_vcpu_if_available(global_guest_id);
+                let vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(global_guest_id);
                 // Run a guest if it is free; otherwise, continue searching for a free guest.
                 if let Ok(vcpu_ptr) = vcpu_ptr {
                     // Fill the guest ID field with the guest's position in the GUESTS static array.
@@ -171,14 +172,14 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     panic!("Couldn't find a job for a hart, hart id: {hart_id}");
 }
 
-pub fn is_hart_dedicated(hart_id: usize) -> bool {
-    // Determine if a hart is dedicated. The dedicated_to
+pub fn is_hart_assigned(hart_id: usize) -> bool {
+    // Determine if a hart is assigned. The assigned_guests
     // field must contain at least one non-null element.
 
-    let dedicated_to = HARTS[hart_id].dedicated_to.get();
+    let assigned_guests = HARTS[hart_id].assigned_guests.get();
 
     unsafe {
-        (*dedicated_to)
+        (*assigned_guests)
             .first()
             .filter(|ptr| !ptr.is_null())
             .is_some()

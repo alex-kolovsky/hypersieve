@@ -3,14 +3,14 @@ use std::{collections::HashMap, io::Write};
 struct Guest {
     entry_gpa: usize,
     harts_cap: usize,
-    dedicated_harts: Vec<Option<u32>>,
+    assigned_harts: Vec<Option<u32>>,
 }
 impl Guest {
-    fn new(entry_gpa: usize, harts_cap: usize, dedicated_harts: Vec<Option<u32>>) -> Self {
+    fn new(entry_gpa: usize, harts_cap: usize, assigned_harts: Vec<Option<u32>>) -> Self {
         Self {
             entry_gpa,
             harts_cap,
-            dedicated_harts,
+            assigned_harts,
         }
     }
 }
@@ -53,11 +53,11 @@ fn main() {
 
     let mut all_harts: Vec<Hart> = Vec::new();
     let mut max_supported_harts_per_guest: usize = 0;
-    let mut max_supported_dedicated_harts_per_guest: usize = 0;
+    let mut max_supported_assigned_harts_per_guest: usize = 0;
 
     let mut harts_cap_sum: usize = 0;
 
-    let mut already_dedicated_harts: HashMap<u32, Vec<Option<usize>>> = HashMap::new();
+    let mut already_assigned_harts: HashMap<u32, Vec<Option<usize>>> = HashMap::new();
 
     let mut paths: Vec<&str> = Vec::new();
 
@@ -93,17 +93,17 @@ fn main() {
                 max_supported_harts_per_guest = harts_cap;
             }
 
-            // Extract dedicated harts
-            if let Some(dedicated_harts) = guest.property("dedicated-harts") {
-                // Convert a raw `dedicated-harts` DTB property into native CPU Hart IDs.
-                let dedicated_harts_raw = dedicated_harts.value;
+            // Extract assigned harts.
+            if let Some(assigned_harts) = guest.property("assigned-harts") {
+                // Convert a raw `assigned-harts` DTB property into native CPU Hart IDs.
+                let assigned_harts_raw = assigned_harts.value;
 
-                if dedicated_harts_raw.len() % 4 != 0 {
-                    panic!("dedicated-harts cell is not a multiple of 4 bytes");
+                if assigned_harts_raw.len() % 4 != 0 {
+                    panic!("assigned-harts cell is not a multiple of 4 bytes");
                 }
 
                 let mut harts = Vec::new();
-                let (chunks, _remainder) = dedicated_harts_raw.as_chunks::<4>();
+                let (chunks, _remainder) = assigned_harts_raw.as_chunks::<4>();
 
                 for bytes in chunks.iter() {
                     let hart_id: u32 = u32::from_be_bytes(*bytes);
@@ -111,25 +111,25 @@ fn main() {
                 }
                 if harts.len() > harts_cap {
                     panic!(
-                        "Dedicated harts count ({}) cannot be bigger than harts capacity ({harts_cap})\nGuest name: {}",
+                        "Assigned harts count ({}) cannot be bigger than harts capacity ({harts_cap})\nGuest name: {}",
                         harts.len(),
                         guest.name,
                     );
                 }
 
-                // Find the maximum number of dedicated harts among all VMs.
-                if harts.len() > max_supported_dedicated_harts_per_guest {
-                    max_supported_dedicated_harts_per_guest = harts.len();
+                // Find the maximum number of assigned harts among all VMs.
+                if harts.len() > max_supported_assigned_harts_per_guest {
+                    max_supported_assigned_harts_per_guest = harts.len();
                 }
 
-                // Increment the dedication counter for each assigned hart.
+                // Increment the assignment counter for each assigned hart.
                 for hart in &harts {
-                    if let Some(already_dedicated_hart) =
-                        already_dedicated_harts.get_mut(&hart.unwrap())
+                    if let Some(already_assigned_hart) =
+                        already_assigned_harts.get_mut(&hart.unwrap())
                     {
-                        already_dedicated_hart.push(Some(guest_index));
+                        already_assigned_hart.push(Some(guest_index));
                     } else {
-                        already_dedicated_harts.insert(hart.unwrap(), vec![Some(guest_index)]);
+                        already_assigned_harts.insert(hart.unwrap(), vec![Some(guest_index)]);
                     }
                 }
 
@@ -142,21 +142,21 @@ fn main() {
         }
     }
 
-    let mut max_supported_dedicated_guests_per_hart: usize = 0;
+    let mut max_supported_assigned_guests_per_hart: usize = 0;
 
-    for times_dedicated in already_dedicated_harts.values() {
-        if times_dedicated.len() > max_supported_dedicated_guests_per_hart {
-            max_supported_dedicated_guests_per_hart = times_dedicated.len();
+    for times_assigned in already_assigned_harts.values() {
+        if times_assigned.len() > max_supported_assigned_guests_per_hart {
+            max_supported_assigned_guests_per_hart = times_assigned.len();
         }
     }
 
     for hart_id in 0..harts_cap_sum {
-        if let Some(dedicated_to) = already_dedicated_harts.get(&(hart_id as u32)) {
+        if let Some(assigned_guests) = already_assigned_harts.get(&(hart_id as u32)) {
             let entry: Hart = Hart {
                 hart_id,
                 guests: Vec::new(),
             };
-            for _ in 0..(max_supported_dedicated_guests_per_hart - dedicated_to.len()) {}
+            for _ in 0..(max_supported_assigned_guests_per_hart - assigned_guests.len()) {}
             all_harts.push(entry);
         } else {
             let entry = Hart {
@@ -176,9 +176,9 @@ fn main() {
         "// Automaticly generated by build.rs. Do not edit.
 use crate::multihart::Hart;
 
-pub const MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART: usize = {max_supported_dedicated_guests_per_hart};
+pub const MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART: usize = {max_supported_assigned_guests_per_hart};
 pub const MAX_SUPPORTED_HARTS_PER_GUEST: usize = {max_supported_harts_per_guest};
-pub const MAX_SUPPORTED_DEDICATED_HARTS_PER_GUEST: usize = {max_supported_dedicated_harts_per_guest};
+pub const MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST: usize = {max_supported_assigned_harts_per_guest};
 
 pub const HARTS_CAP_SUM: usize = {harts_cap_sum};
 
@@ -202,14 +202,14 @@ pub static GUESTS: [Guest; {}] = [
         }
         vcpus.push(']');
 
-        let mut dedicated_harts_count: usize = 0;
-        for hart in guest.dedicated_harts.iter().flatten() {
+        let mut assigned_harts_count: usize = 0;
+        for hart in guest.assigned_harts.iter().flatten() {
             all_harts[*hart as usize].guests.push(Some(i));
-            dedicated_harts_count += 1;
+            assigned_harts_count += 1;
         }
 
-        while guest.dedicated_harts.len() < max_supported_dedicated_harts_per_guest {
-            guest.dedicated_harts.push(None);
+        while guest.assigned_harts.len() < max_supported_assigned_harts_per_guest {
+            guest.assigned_harts.push(None);
         }
 
         // Add guest entry in GUESTS array.
@@ -218,10 +218,10 @@ pub static GUESTS: [Guest; {}] = [
             "Guest {{
     entry_gpa: {},
     active_hart_count: core::sync::atomic::AtomicUsize::new(0),
-    active_dedicated_hart_count: core::sync::atomic::AtomicUsize::new(0),
+    active_assigned_hart_count: core::sync::atomic::AtomicUsize::new(0),
     harts_cap: {},
-    dedicated_harts_cap: {dedicated_harts_count},
-    dedicated_harts: {:#?},
+    assigned_harts_cap: {assigned_harts_count},
+    assigned_harts: {:#?},
     data: include_bytes!(\"{manifest_dir}/{}\"),
     vcpus: core::cell::UnsafeCell::new({vcpus}),
     vcpu_ptrs: spin::Mutex::new([const {{ None }}; MAX_SUPPORTED_HARTS_PER_GUEST]),
@@ -229,8 +229,8 @@ pub static GUESTS: [Guest; {}] = [
 
 ",
             guest.entry_gpa,
-            guest.harts_cap - dedicated_harts_count,
-            guest.dedicated_harts,
+            guest.harts_cap - assigned_harts_count,
+            guest.assigned_harts,
             paths[i]
         )
         .unwrap();
@@ -251,14 +251,14 @@ static HARTS: [Hart; HARTS_CAP_SUM] = [
             f,
             "
 Hart {{
-    dedicated_to: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_DEDICATED_GUESTS_PER_HART]),
+    assigned_guests: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
     guests: ["
         )
         .unwrap();
         for guest_id in &hart.guests {
             writeln!(f, "{guest_id:#?},").unwrap();
         }
-        for _ in 0..(max_supported_dedicated_guests_per_hart - hart.guests.len()) {
+        for _ in 0..(max_supported_assigned_guests_per_hart - hart.guests.len()) {
             writeln!(f, "None,").unwrap();
         }
         writeln!(f, "]}},").unwrap();

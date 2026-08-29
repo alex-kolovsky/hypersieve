@@ -160,16 +160,16 @@ impl Vcpu {
         let guest_id_for_hart = self.guest_id_for_hart;
         let host_hart_id = self.host_hart_id;
 
-        let is_dedicated = crate::multihart::is_hart_dedicated(host_hart_id);
+        let is_assigned = crate::multihart::is_hart_assigned(host_hart_id);
         let mut guest_id = guest_id_for_hart;
 
-        if is_dedicated {
-            // Update the global active dedicated hart counter.
+        if is_assigned {
+            // Update the global active assigned hart counter.
             GUESTS[crate::HARTS[host_hart_id].guests[guest_id].unwrap()]
-                .active_dedicated_hart_count
+                .active_assigned_hart_count
                 .fetch_sub(1, Ordering::Acquire);
         } else {
-            // If a hart is not dedicated, release this vcpu.
+            // If a hart is not assigned, release this vcpu.
             let mut vcpu_ptrs = GUESTS[guest_id].vcpu_ptrs.lock();
             for vcpu_ptr in (*vcpu_ptrs).iter_mut() {
                 if vcpu_ptr.is_none() {
@@ -192,17 +192,17 @@ impl Vcpu {
         unsafe {
             loop {
                 let vcpu_ptr: Result<*mut Vcpu, ()>;
-                if is_dedicated {
+                if is_assigned {
                     let hart = &crate::HARTS[self.host_hart_id];
                     if hart.guests.len() <= guest_id {
                         guest_id = 0;
                     }
-                    if crate::guest::assign_dedicated_vcpu_if_available(
+                    if crate::guest::claim_assigned_hart_slot_if_available(
                         hart.guests[guest_id].unwrap(),
                     )
                     .is_ok()
                     {
-                        vcpu_ptr = Ok((*hart.dedicated_to.get())[guest_id]);
+                        vcpu_ptr = Ok((*hart.assigned_guests.get())[guest_id]);
                     } else {
                         vcpu_ptr = Err(());
                     }
@@ -210,7 +210,7 @@ impl Vcpu {
                     if GUESTS.len() <= guest_id {
                         guest_id = 0;
                     }
-                    vcpu_ptr = crate::guest::assign_vcpu_if_available(guest_id);
+                    vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(guest_id);
                 }
 
                 // Run a guest if it is free; otherwise, continue searching for a free guest.
