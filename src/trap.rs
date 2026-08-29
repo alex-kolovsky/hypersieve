@@ -1,4 +1,4 @@
-use crate::{print, println, vcpu::Vcpu};
+use crate::{println, vcpu::Vcpu};
 use core::{
     arch::{asm, naked_asm},
     mem::offset_of,
@@ -230,7 +230,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
                 0x01 => {
                     let a0 = (*vcpu).a0;
 
-                    print!("{}", a0 as u8 as char);
+                    asm!("ecall", in("a7") 0x01, in("a0") a0);
                 }
                 _ => {
                     panic!("Ecall EID cannot be processed.")
