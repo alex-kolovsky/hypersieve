@@ -160,17 +160,7 @@ impl Vcpu {
         let guest_id_for_hart = self.guest_id_for_hart;
         let host_hart_id = self.host_hart_id;
 
-        let dedicated_to = crate::HARTS[host_hart_id].dedicated_to.get();
-
-        // Determine if a hart is dedicated. The dedicated_to
-        // field must contain at least one non-null element.
-        let is_dedicated = unsafe {
-            (*dedicated_to)
-                .first()
-                .filter(|ptr| !ptr.is_null())
-                .is_some()
-        };
-
+        let is_dedicated = crate::multihart::is_hart_dedicated(host_hart_id);
         let mut guest_id = guest_id_for_hart;
 
         if is_dedicated {

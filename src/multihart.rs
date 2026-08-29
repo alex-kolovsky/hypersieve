@@ -129,13 +129,7 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     if HARTS.len() <= hart_id {
         panic!("Excess hart, hart id: {hart_id}");
     }
-    // Determine if a hart is dedicated. The dedicated_to
-    // field must contain at least one non-null pointer.
-    if unsafe { *(crate::HARTS[hart_id].dedicated_to.get()) }
-        .first()
-        .filter(|ptr| !ptr.is_null())
-        .is_some()
-    {
+    if is_hart_dedicated(hart_id) {
         // Run a guest on a dedicated hart.
 
         // Extract the guests for which this hart is dedicated.
@@ -175,4 +169,18 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
 
     // A hart is excess if there are no free guests for it.
     panic!("Couldn't find a job for a hart, hart id: {hart_id}");
+}
+
+pub fn is_hart_dedicated(hart_id: usize) -> bool {
+    // Determine if a hart is dedicated. The dedicated_to
+    // field must contain at least one non-null element.
+
+    let dedicated_to = HARTS[hart_id].dedicated_to.get();
+
+    unsafe {
+        (*dedicated_to)
+            .first()
+            .filter(|ptr| !ptr.is_null())
+            .is_some()
+    }
 }
