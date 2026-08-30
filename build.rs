@@ -86,6 +86,10 @@ fn main() {
 
             paths.push(path);
 
+            if !std::path::Path::exists(std::path::Path::new(path)) {
+                panic!("Guest file {path} not found.");
+            }
+
             harts_cap_sum += harts_cap;
 
             // Find the maximum number of harts among all VMs.
