@@ -100,6 +100,78 @@ extern \"C\" fn save_vector_registers(vcpu: *mut Vcpu) {{
         v0_offset = const offset_of!(Vcpu, v0),
         vlen = const crate::VLEN,
     );
+}}
+
+#[unsafe(naked)]
+extern \"C\" fn restore_vector_registers(vcpu: *mut Vcpu) {{
+    naked_asm!(
+        \"addi a0, a0, {{v0_offset}}\",
+        \"vl1r.v v0, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v1, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v2, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v3, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v4, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v5, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v6, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v7, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v8, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v9, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v10, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v11, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v12, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v13, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v14, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v15, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v16, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v17, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v18, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v19, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v20, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v21, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v22, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v23, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v24, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v25, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v26, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v27, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v28, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v29, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v30, (a0)\",
+        \"addi a0, a0, {{vlen}}\",
+        \"vl1r.v v31, (a0)\",
+        v0_offset = const offset_of!(Vcpu, v0),
+        vlen = const crate::VLEN,
+    );
 }}"
     )
     .unwrap();
@@ -116,7 +188,11 @@ fn write_empty_vector_extension_support_file(
 pub const VLEN: usize = 0;
 
 #[allow(unused_variables)]
-pub const fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{}}"
+pub const fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{}}
+
+#[allow(unused_variables)]
+pub const fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{}}
+"
     )
     .unwrap();
 }
