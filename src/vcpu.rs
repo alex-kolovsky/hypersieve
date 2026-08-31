@@ -307,6 +307,9 @@ impl Vcpu {
     }
 
     pub fn run(&mut self) -> ! {
+        // Restore vector registers.
+        crate::restore_vector_registers(self as *mut Vcpu);
+
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
         }
