@@ -157,6 +157,14 @@ pub extern "C" fn trap_handler() {
     );
 }
 pub fn handle_trap(vcpu: *mut Vcpu) {
+    let vsstatus = unsafe { (*vcpu).vsstatus };
+
+    let vsstatus_vs = vsstatus & (1 << 9 | 1 << 10);
+    // let vsstatus_fs = vsstatus & (1 << 13 | 1 << 14);
+
+    if vsstatus_vs == 3 {
+        crate::save_vector_registers(vcpu);
+    }
     let scause = unsafe { (*vcpu).scause };
 
     // Extract type of trap (exception/interrupt).

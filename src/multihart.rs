@@ -81,13 +81,13 @@ pub fn hart_configure() {
 
 #[inline(always)]
 pub fn start_harts(main_hart_id: usize) {
-    let harts_count = number_of_harts();
+    let hart_count = number_of_harts();
     let mut error_code: isize = 0;
     let mut value: isize = 0;
     let stack_size = 1024 * 1024;
     let mut sp: *mut u8;
 
-    for hart_id in 0..harts_count {
+    for hart_id in 0..hart_count {
         // Skip the main hart.
         if hart_id != main_hart_id {
             // Allocate a stack for a hart.

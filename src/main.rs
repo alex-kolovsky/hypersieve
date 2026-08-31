@@ -15,9 +15,10 @@ use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART};
 
 core::arch::global_asm!(include_str!("asm/boot.S"));
 
-// Include the file created by the build script.
-include!(concat!(env!("OUT_DIR"), "/guests.rs"));
-include!(concat!(env!("OUT_DIR"), "/vector_extension.rs"));
+// Include files created by the build script.
+include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

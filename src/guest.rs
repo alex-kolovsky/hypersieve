@@ -16,8 +16,8 @@ pub struct Guest {
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub active_hart_count: AtomicUsize,
     pub active_assigned_hart_count: AtomicUsize,
-    pub harts_cap: usize,
-    pub assigned_harts_cap: usize,
+    pub hart_capacity: usize,
+    pub assigned_hart_capacity: usize,
     pub assigned_harts: [Option<u32>; MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST],
     pub data: &'static [u8],
 }
@@ -58,10 +58,10 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()
     let is_free = guest.active_hart_count.try_update(
         Ordering::SeqCst,
         Ordering::SeqCst,
-        |active_harts_count| {
-            if active_harts_count < guest.harts_cap {
+        |active_hart_count| {
+            if active_hart_count < guest.hart_capacity {
                 // Increment the active harts counter.
-                Some(active_harts_count + 1)
+                Some(active_hart_count + 1)
             } else {
                 None
             }
@@ -89,10 +89,10 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> 
     let is_free = guest.active_assigned_hart_count.try_update(
         Ordering::SeqCst,
         Ordering::SeqCst,
-        |active_assigned_harts_count| {
-            if active_assigned_harts_count < guest.assigned_harts_cap {
+        |active_assigned_hart_count| {
+            if active_assigned_hart_count < guest.assigned_hart_capacity {
                 // Increment the active assigned harts counter.
-                Some(active_assigned_harts_count + 1)
+                Some(active_assigned_hart_count + 1)
             } else {
                 None
             }
@@ -107,7 +107,7 @@ pub fn initialize_guests() {
     for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
-        for i in 0..(guest.harts_cap + guest.assigned_harts_cap) {
+        for i in 0..(guest.hart_capacity + guest.assigned_hart_capacity) {
             // Get the pointer to the first vCPU in guest.vcpus.
             let base_ptr: *mut Option<Vcpu> = vcpus as *mut Option<Vcpu>;
 
