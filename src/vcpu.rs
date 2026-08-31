@@ -1,6 +1,6 @@
 pub const TIMER_OFFSET: u64 = 10_000;
 
-use crate::{GUESTS, read_csr};
+use crate::{GUESTS, VLEN_SIZE, read_csr};
 use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
 
 #[repr(C)]
@@ -60,7 +60,42 @@ pub struct Vcpu {
     pub vsie: u64,
     pub vsatp: u64,
     pub vstimecmp: u64,
+
+    // Vector registers
+    pub v0: [u32; VLEN_SIZE / 32],
+    pub v1: [u32; VLEN_SIZE / 32],
+    pub v2: [u32; VLEN_SIZE / 32],
+    pub v3: [u32; VLEN_SIZE / 32],
+    pub v4: [u32; VLEN_SIZE / 32],
+    pub v5: [u32; VLEN_SIZE / 32],
+    pub v6: [u32; VLEN_SIZE / 32],
+    pub v7: [u32; VLEN_SIZE / 32],
+    pub v8: [u32; VLEN_SIZE / 32],
+    pub v9: [u32; VLEN_SIZE / 32],
+    pub v10: [u32; VLEN_SIZE / 32],
+    pub v11: [u32; VLEN_SIZE / 32],
+    pub v12: [u32; VLEN_SIZE / 32],
+    pub v13: [u32; VLEN_SIZE / 32],
+    pub v14: [u32; VLEN_SIZE / 32],
+    pub v15: [u32; VLEN_SIZE / 32],
+    pub v16: [u32; VLEN_SIZE / 32],
+    pub v17: [u32; VLEN_SIZE / 32],
+    pub v18: [u32; VLEN_SIZE / 32],
+    pub v19: [u32; VLEN_SIZE / 32],
+    pub v20: [u32; VLEN_SIZE / 32],
+    pub v21: [u32; VLEN_SIZE / 32],
+    pub v22: [u32; VLEN_SIZE / 32],
+    pub v23: [u32; VLEN_SIZE / 32],
+    pub v24: [u32; VLEN_SIZE / 32],
+    pub v25: [u32; VLEN_SIZE / 32],
+    pub v26: [u32; VLEN_SIZE / 32],
+    pub v27: [u32; VLEN_SIZE / 32],
+    pub v28: [u32; VLEN_SIZE / 32],
+    pub v29: [u32; VLEN_SIZE / 32],
+    pub v30: [u32; VLEN_SIZE / 32],
+    pub v31: [u32; VLEN_SIZE / 32],
 }
+
 impl Vcpu {
     pub const fn zeroed() -> Self {
         Self {
@@ -118,6 +153,40 @@ impl Vcpu {
             vsie: 0,
             vsatp: 0,
             vstimecmp: 0,
+
+            // Vector registers
+            v0: [0; VLEN_SIZE / 32],
+            v1: [0; VLEN_SIZE / 32],
+            v2: [0; VLEN_SIZE / 32],
+            v3: [0; VLEN_SIZE / 32],
+            v4: [0; VLEN_SIZE / 32],
+            v5: [0; VLEN_SIZE / 32],
+            v6: [0; VLEN_SIZE / 32],
+            v7: [0; VLEN_SIZE / 32],
+            v8: [0; VLEN_SIZE / 32],
+            v9: [0; VLEN_SIZE / 32],
+            v10: [0; VLEN_SIZE / 32],
+            v11: [0; VLEN_SIZE / 32],
+            v12: [0; VLEN_SIZE / 32],
+            v13: [0; VLEN_SIZE / 32],
+            v14: [0; VLEN_SIZE / 32],
+            v15: [0; VLEN_SIZE / 32],
+            v16: [0; VLEN_SIZE / 32],
+            v17: [0; VLEN_SIZE / 32],
+            v18: [0; VLEN_SIZE / 32],
+            v19: [0; VLEN_SIZE / 32],
+            v20: [0; VLEN_SIZE / 32],
+            v21: [0; VLEN_SIZE / 32],
+            v22: [0; VLEN_SIZE / 32],
+            v23: [0; VLEN_SIZE / 32],
+            v24: [0; VLEN_SIZE / 32],
+            v25: [0; VLEN_SIZE / 32],
+            v26: [0; VLEN_SIZE / 32],
+            v27: [0; VLEN_SIZE / 32],
+            v28: [0; VLEN_SIZE / 32],
+            v29: [0; VLEN_SIZE / 32],
+            v30: [0; VLEN_SIZE / 32],
+            v31: [0; VLEN_SIZE / 32],
         }
     }
     pub fn new(

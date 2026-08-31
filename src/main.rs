@@ -17,6 +17,7 @@ core::arch::global_asm!(include_str!("asm/boot.S"));
 
 // Include the file created by the build script.
 include!(concat!(env!("OUT_DIR"), "/guests.rs"));
+include!(concat!(env!("OUT_DIR"), "/vector_extension.rs"));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
