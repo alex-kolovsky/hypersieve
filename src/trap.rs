@@ -160,10 +160,15 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     let vsstatus = unsafe { (*vcpu).vsstatus };
 
     // Save vector registers if vector extension turned on.
-    let vsstatus_vs = vsstatus & (1 << 9 | 1 << 10);
+    let vsstatus_vs = (vsstatus & (1 << 9 | 1 << 10)) >> 9;
 
     if vsstatus_vs == 3 {
         crate::save_vector_registers(vcpu);
+
+        unsafe {
+            (*vcpu).vsstatus &= !(1 << 9 | 1 << 10);
+            (*vcpu).vsstatus |= 2 << 9;
+        }
     }
 
     let scause = unsafe { (*vcpu).scause };
