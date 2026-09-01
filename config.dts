@@ -5,7 +5,7 @@
     #size-cells = <1>;
 
     hypervisor-config {
-        vlen-size = <32>;
+        vlen-size = <128>;
         vm0 {
             path = "target/guest-1/guest-1.bin";
 
