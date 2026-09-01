@@ -300,10 +300,9 @@ impl Vcpu {
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
 
         unsafe {
-            switch_to_guest(next_guest, vstimecmp);
+            (*next_guest).vstimecmp = vstimecmp;
+            (*next_guest).run();
         }
-
-        unreachable!();
     }
 
     pub fn run(&mut self) -> ! {

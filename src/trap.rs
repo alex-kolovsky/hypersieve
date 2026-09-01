@@ -246,8 +246,8 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
 
                     asm!("ecall", in("a7") 0x01, in("a0") a0);
                 }
-                _ => {
-                    panic!("Ecall EID cannot be processed.")
+                ecall_eid => {
+                    panic!("Ecall EID ({ecall_eid}) cannot be processed.")
                 }
             }
             (*vcpu).sepc += 4;
