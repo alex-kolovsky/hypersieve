@@ -43,6 +43,12 @@ fn main() {
         hypervisor_configuration.vlen,
     );
 
+    // Generate floating-point extension support file.
+    build_modules::floating_point_extension_support::generate_floating_point_extension_support(
+        &out_dir,
+        hypervisor_configuration.floating_point_extension,
+    );
+
     // Generate guest constants file.
     build_modules::guest_constants::generate_guest_constants(
         out_dir.as_str(),

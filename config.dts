@@ -6,6 +6,8 @@
 
     hypervisor-config {
         vlen-size = <128>;
+        floating-point-extension;
+
         vm0 {
             path = "target/guest-1/guest-1.bin";
 

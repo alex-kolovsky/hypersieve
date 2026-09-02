@@ -11,6 +11,7 @@ pub struct HypervisorConfiguration {
     pub max_supported_assigned_harts_per_guest: usize,
 
     pub vlen: usize,
+    pub floating_point_extension: bool,
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf) {
@@ -58,6 +59,7 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
     let mut total_hart_capacity: usize = 0;
 
     let vlen: usize;
+    let floating_point_extension: bool;
 
     let mut guests: Vec<Guest> = Vec::new();
     let fdt = fdt::Fdt::new(&dtb_data).unwrap();
@@ -68,6 +70,8 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
             .expect("No vlen-size property in DTS")
             .as_usize()
             .unwrap();
+
+        floating_point_extension = hypervisor.property("floating-point-extension").is_some();
 
         for guest in hypervisor.children() {
             // Extract the VM entry address.
@@ -170,5 +174,6 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
         harts,
         total_hart_capacity,
         vlen,
+        floating_point_extension,
     }
 }
