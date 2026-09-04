@@ -5,8 +5,11 @@ li a7, 0x01
 
 bnez a0, second_vcpu
 
+li t0, 'F'
+fmv.w.x f10, t0
+fmv.x.w a0, f10
+
 first_vcpu:
-    li a0, 'C'
     ecall
 
     j first_vcpu
