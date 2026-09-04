@@ -83,8 +83,8 @@ impl<const ORDER: usize> Heap<ORDER> {
                             if same_size_ptr.is_null() {
                                 self.free_list[found_node_index - index] = buddy_ptr;
                             } else {
+                                let target = buddy_ptr as *mut *mut u8;
                                 unsafe {
-                                    let target = buddy_ptr as *mut *mut u8;
                                     *target = null_mut();
                                 }
                             }

@@ -157,11 +157,12 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     } else {
         // Run a guest on a non-assigned hart.
         for global_guest_id in 0..GUESTS.len() {
-            unsafe {
-                let vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(global_guest_id);
-                // Run a guest if it is free; otherwise, continue searching for a free guest.
-                if let Ok(vcpu_ptr) = vcpu_ptr {
-                    // Fill the guest ID field with the guest's position in the GUESTS static array.
+            // Check if a guest is free.
+            let vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(global_guest_id);
+            // Run a guest if it is free; otherwise, continue searching for a free guest.
+            if let Ok(vcpu_ptr) = vcpu_ptr {
+                // Fill the guest ID field with the guest's position in the GUESTS static array.
+                unsafe {
                     (*vcpu_ptr).very_fisrt_run(hart_id, global_guest_id);
                 }
             }

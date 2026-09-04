@@ -331,42 +331,44 @@ impl Vcpu {
 
         let next_guest: *mut Vcpu;
 
-        unsafe {
-            loop {
-                let vcpu_ptr: Result<*mut Vcpu, ()>;
-                if is_assigned {
-                    let hart = &crate::HARTS[self.host_hart_id];
-                    if hart.guests.len() <= guest_id {
-                        guest_id = 0;
-                    }
-                    if crate::guest::claim_assigned_hart_slot_if_available(
-                        hart.guests[guest_id].unwrap(),
-                    )
-                    .is_ok()
-                    {
+        loop {
+            let vcpu_ptr: Result<*mut Vcpu, ()>;
+            if is_assigned {
+                let hart = &crate::HARTS[self.host_hart_id];
+                if hart.guests.len() <= guest_id {
+                    guest_id = 0;
+                }
+                if crate::guest::claim_assigned_hart_slot_if_available(
+                    hart.guests[guest_id].unwrap(),
+                )
+                .is_ok()
+                {
+                    unsafe {
                         vcpu_ptr = Ok((*hart.assigned_guests.get())[guest_id]);
-                    } else {
-                        vcpu_ptr = Err(());
                     }
                 } else {
-                    if GUESTS.len() <= guest_id {
-                        guest_id = 0;
-                    }
-                    vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(guest_id);
+                    vcpu_ptr = Err(());
                 }
+            } else {
+                if GUESTS.len() <= guest_id {
+                    guest_id = 0;
+                }
+                vcpu_ptr = crate::guest::claim_vcpu_for_hart_if_available(guest_id);
+            }
 
-                // Run a guest if it is free; otherwise, continue searching for a free guest.
-                if let Ok(vcpu_ptr) = vcpu_ptr {
-                    next_guest = vcpu_ptr;
-                    // Fill the new vcpu with correct values for this hart.
+            // Run a guest if it is free; otherwise, continue searching for a free guest.
+            if let Ok(vcpu_ptr) = vcpu_ptr {
+                next_guest = vcpu_ptr;
+                // Fill the new vcpu with correct values for this hart.
+                unsafe {
                     (*next_guest).guest_id_for_hart = guest_id;
                     (*next_guest).host_hart_id = host_hart_id;
                     (*next_guest).host_sp = host_sp;
-
-                    break;
-                } else {
-                    guest_id += 1;
                 }
+
+                break;
+            } else {
+                guest_id += 1;
             }
         }
 

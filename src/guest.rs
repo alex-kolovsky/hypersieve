@@ -33,9 +33,9 @@ pub fn allocate_guest_memory(
 ) -> Vcpu {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
+    let dst = kernel_memory;
+    let src = image.as_ptr();
     unsafe {
-        let dst = kernel_memory;
-        let src = image.as_ptr();
         core::ptr::copy_nonoverlapping(src, dst, image.len());
     }
 
