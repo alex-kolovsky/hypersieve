@@ -4,6 +4,7 @@ use crate::{GUESTS, VLEN, read_csr};
 use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
 
 #[repr(C)]
+#[repr(align(8))]
 #[derive(Debug, Default)]
 pub struct Vcpu {
     pub host_hart_id: usize,
@@ -195,19 +196,23 @@ impl Vcpu {
         virtual_hart_id: u64,
     ) -> Self {
         // Set the XLEN for VS-mode (VSXL bitfield) to 64 bits in hstatus.
-        let vsxl: u64 = 2 << 32;
+        let hstatus_vsxl: u64 = 2 << 32;
         // Set Supervisor Previous Virtualization (SPV) to 1 so the sret instruction boots the CPU into virtual mode.
-        let spv: u64 = 1 << 7;
-        let hstatus: u64 = spv | vsxl; // hstatus: Hypervisor Status
+        let hstatus_spv: u64 = 1 << 7;
+        let hstatus: u64 = hstatus_spv | hstatus_vsxl; // hstatus: Hypervisor Status
 
-        // Set the Vector Status (VS) bitfield in vsstatus to enable vector extension in VS-mode.
-        let vs: u64 = 1 << 9;
-        let vsstatus = vs; // vsstatus: Virtual Supervisor Status
+        // Set the Vector Status (VS) and the Floating-point Status (FS)
+        // bitfield in vsstatus to enable vector extension in VS-mode.
+        let sstatus_vs: u64 = 1 << 9;
+        let sstatus_fs = 1 << 13;
+
+        let vsstatus = sstatus_vs | sstatus_fs; // vsstatus: Virtual Supervisor Status
 
         // Set Supervisor Previous Privilege mode (SPP) to 1 so the sret instruction boots the CPU into Supervisor mode (VS-mode in our case).
-        let spp: u64 = 1 << 8;
-        let sstatus: u64 = spp | vs; // sstatus: Supervisor Status
+        let sstatus_spp: u64 = 1 << 8;
+        let sstatus: u64 = sstatus_spp | sstatus_vs | sstatus_fs; // sstatus: Supervisor Status
 
+        // Set harts stack size.
         let stack_size = 512 * 1024;
         let host_sp: u64 = crate::allocator::alloc_pages(stack_size) as u64 + stack_size as u64;
 

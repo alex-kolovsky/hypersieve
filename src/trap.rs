@@ -96,6 +96,9 @@ pub extern "C" fn trap_handler() {
         "csrr t0, vstimecmp",
         "sd t0, {vstimecmp_offset}(a0)",
 
+        "ld t0, {sstatus_offset}(a0)",
+        "csrw sstatus, t0",
+
         // Restore a0 from sscratch, and save in to VCpu.
         "csrr t0, sscratch",
         "sd t0, {a0_offset}(a0)",
@@ -106,11 +109,13 @@ pub extern "C" fn trap_handler() {
         // a0 (first argument) is still the vcpu pointer here.
         "call {handle_trap}",
         handle_trap = sym handle_trap,
-        //CSRs
-
+        // Host CSRs
         scause_offset = const offset_of!(Vcpu, scause),
         sepc_offset = const offset_of!(Vcpu, sepc),
+        sstatus_offset = const offset_of!(Vcpu, sstatus),
         hstatus_offset = const offset_of!(Vcpu, hstatus),
+
+        // Guest CSRs
         vsstatus_offset = const offset_of!(Vcpu, vsstatus),
         vstvec_offset = const offset_of!(Vcpu, vstvec),
         vsscratch_offset = const offset_of!(Vcpu, vsscratch),
@@ -120,9 +125,8 @@ pub extern "C" fn trap_handler() {
         vsie_offset = const offset_of!(Vcpu, vsie),
         vsatp_offset = const offset_of!(Vcpu, vsatp),
         vstimecmp_offset = const offset_of!(Vcpu, vstimecmp),
-        host_sp_offset = const offset_of!(Vcpu, host_sp),
 
-        // GPRs
+        // Guest GPRs
         ra_offset = const offset_of!(Vcpu, ra),
         sp_offset = const offset_of!(Vcpu, sp),
         gp_offset = const offset_of!(Vcpu, gp),
@@ -154,6 +158,9 @@ pub extern "C" fn trap_handler() {
         t4_offset = const offset_of!(Vcpu, t4),
         t5_offset = const offset_of!(Vcpu, t5),
         t6_offset = const offset_of!(Vcpu, t6),
+
+        // Host GPRs
+        host_sp_offset = const offset_of!(Vcpu, host_sp),
     );
 }
 pub fn handle_trap(vcpu: *mut Vcpu) {
@@ -255,7 +262,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         }
     } else {
         println!(
-            "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}",
+            "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}\nstval: {:#x}",
             scause_str,
             interrupt_bit,
             exception_code,
@@ -263,6 +270,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             read_csr!("vsstatus"),
             read_csr!("sstatus"),
             read_csr!("sepc"),
+            read_csr!("stval"),
         );
     }
     panic!();
