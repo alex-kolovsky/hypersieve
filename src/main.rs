@@ -15,6 +15,10 @@ use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART};
 
 core::arch::global_asm!(include_str!("asm/boot.S"));
 
+#[allow(unused_import_braces)]
+use core::arch::naked_asm;
+use core::mem::offset_of;
+
 // Include files created by the build script.
 include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
