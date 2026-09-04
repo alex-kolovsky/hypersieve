@@ -178,6 +178,18 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         }
     }
 
+    // Save floating-point registers if floating-point extension turned on.
+    let vsstatus_fs = (vsstatus & (1 << 13 | 1 << 14)) >> 13;
+
+    if vsstatus_fs == 3 {
+        crate::save_floating_point_registers(vcpu);
+
+        unsafe {
+            (*vcpu).vsstatus &= !(1 << 13 | 1 << 14);
+            (*vcpu).vsstatus |= 2 << 13;
+        }
+    }
+
     let scause = unsafe { (*vcpu).scause };
 
     // Extract type of trap (exception/interrupt).

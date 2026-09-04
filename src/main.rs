@@ -23,6 +23,10 @@ use core::mem::offset_of;
 include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
+include!(concat!(
+    env!("OUT_DIR"),
+    "/floating_point_extension_support.rs"
+));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

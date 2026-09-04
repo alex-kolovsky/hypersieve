@@ -382,6 +382,9 @@ impl Vcpu {
         // Restore vector registers.
         crate::restore_vector_registers(self as *mut Vcpu);
 
+        // Restore floating-point registers.
+        crate::restore_floating_point_registers(self as *mut Vcpu);
+
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
         }
