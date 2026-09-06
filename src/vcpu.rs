@@ -302,17 +302,19 @@ impl Vcpu {
         let guest_id_for_hart = self.guest_id_for_hart;
         let host_hart_id = self.host_hart_id;
 
+        let current_guest = crate::guest::get_current_guest(&host_hart_id, &guest_id_for_hart);
+
         let is_assigned = crate::multihart::is_hart_assigned(host_hart_id);
         let mut guest_id = guest_id_for_hart;
 
         if is_assigned {
             // Update the global active assigned hart counter.
-            GUESTS[crate::HARTS[host_hart_id].guests[guest_id].unwrap()]
+            current_guest
                 .active_assigned_hart_count
                 .fetch_sub(1, Ordering::Acquire);
         } else {
             // If a hart is not assigned, release this vcpu.
-            let mut vcpu_ptrs = GUESTS[guest_id].vcpu_ptrs.lock();
+            let mut vcpu_ptrs = current_guest.vcpu_ptrs.lock();
             for vcpu_ptr in (*vcpu_ptrs).iter_mut() {
                 if vcpu_ptr.is_none() {
                     *vcpu_ptr = Some(self as *mut Vcpu);

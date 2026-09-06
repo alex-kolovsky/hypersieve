@@ -160,3 +160,17 @@ pub fn initialize_guests() {
         }
     }
 }
+
+pub fn get_current_guest<'a>(hart_id: &'a usize, guest_id_for_hart: &'a usize) -> &'a crate::Guest {
+    // If hart is assigned, take a guest from the local array of dedicated guests.
+    if crate::multihart::is_hart_assigned(*hart_id) {
+        let hart = &crate::HARTS[*hart_id];
+
+        let guest_id = hart.guests[*guest_id_for_hart];
+        &crate::GUESTS[guest_id.unwrap()]
+
+    // If hart is not assigned, take a guest from the global guests array.
+    } else {
+        &crate::GUESTS[*guest_id_for_hart]
+    }
+}
