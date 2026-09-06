@@ -9,7 +9,11 @@ build = "build.rs"
 panic = "abort"
 
 [profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
 panic = "abort"
+strip = true
 
 [dependencies]
 spin = "0.12.3"
