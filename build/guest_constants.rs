@@ -45,6 +45,9 @@ pub static GUESTS: [Guest; {}] = [
         for _assigned_hart in guest.assigned_harts.iter().flatten() {
             assigned_hart_count += 1;
         }
+        if assigned_hart_count > guest.hart_capacity {
+            panic!("Assigned hart count cannot be bigger than general hart capacity.")
+        }
 
         // Add guest entry in GUESTS array.
         writeln!(
