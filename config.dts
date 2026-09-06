@@ -14,13 +14,13 @@
             hart-capacity = <2>;
             assigned-harts = <0 1>;
 
-            entry = <0x100000>;
+            entry = <0x0>;
         };
 
         vm1 {
             path = "target/guest-2/guest-2.bin";
 
-            hart-capacity = <2>;
+            hart-capacity = <1>;
 
             entry = <0x100000>;
         };

@@ -1,4 +1,4 @@
-use crate::{println, vcpu::Vcpu};
+use crate::vcpu::Vcpu;
 use core::{
     arch::{asm, naked_asm},
     mem::offset_of,
@@ -243,10 +243,12 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     };
 
     if exception_code == 6 && interrupt_bit == 1 {
+        // Timer interrupt
         unsafe {
             (*vcpu).run_next_guest();
         }
     } else if exception_code == 10 && interrupt_bit == 0 {
+        // Ecall
         unsafe {
             match (*vcpu).a7 {
                 // Base extension
@@ -272,8 +274,29 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             (*vcpu).sepc += 4;
             (*vcpu).run();
         }
+    } else if exception_code == 23 && interrupt_bit == 0 {
+        // Store/AMO Guest Page Fault
+        let requested_guest_addr = read_csr!("stval");
+
+        let host_hart_id = unsafe { (*vcpu).host_hart_id };
+        let guest_id_for_hart = unsafe { (*vcpu).guest_id_for_hart };
+
+        let current_guest: &crate::Guest =
+            crate::guest::get_current_guest(&host_hart_id, &guest_id_for_hart);
+
+        let locked_page_table = current_guest.page_table.lock();
+        locked_page_table.map_and_allocate(
+            requested_guest_addr,
+            4096,
+            crate::guest_table::PTE_R | crate::guest_table::PTE_W,
+        );
+
+        unsafe {
+            drop(locked_page_table);
+            (*vcpu).run();
+        }
     } else {
-        println!(
+        panic!(
             "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}\nstval: {:#x}",
             scause_str,
             interrupt_bit,
@@ -285,5 +308,5 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             read_csr!("stval"),
         );
     }
-    panic!();
+    unreachable!()
 }
