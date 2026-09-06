@@ -35,22 +35,43 @@ impl Table {
     }
 
     pub fn entry_by_addr(&mut self, guest_paddr: u64, level: usize) -> &mut PageEntry {
+        // Level 0-2 VPN index widths are 9 bits (Sv48x4).
+        let mask = 0x1ff;
         // Page entry contains a 12-bit offset that we shift, and it's also divided into blocks of 9 bits.
         // Each block is represented by the page table `level`.
-        let index = (guest_paddr >> (12 + 9 * level)) & 0x1ff;
+        let index = (guest_paddr >> (12 + 9 * level)) & mask;
+        &mut self.0[index as usize]
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug)]
+pub struct Level3Table(pub [PageEntry; 2048]);
+
+impl Level3Table {
+    pub fn alloc() -> *mut Level3Table {
+        crate::allocator::alloc_pages(size_of::<Level3Table>()) as *mut Level3Table
+    }
+
+    pub fn entry_by_addr(&mut self, guest_paddr: u64) -> &mut PageEntry {
+        // Level 3 VPN index width is 11 bits (Sv48x4).
+        let mask = 0x7ff;
+        // Page entry contains a 12-bit offset that we shift, and it's also divided into blocks of 9 bits.
+        // Each block is represented by the page table `level`.
+        let index = (guest_paddr >> (12 + 9 * 3)) & mask;
         &mut self.0[index as usize]
     }
 }
 
 #[derive(Debug)]
 pub struct GuestPageTable {
-    table: *mut Table,
+    pub table: *mut Level3Table,
 }
 
 impl GuestPageTable {
     pub fn new() -> Self {
         Self {
-            table: Table::alloc(),
+            table: Level3Table::alloc(),
         }
     }
 
@@ -70,9 +91,16 @@ impl GuestPageTable {
     }
 
     pub fn map(&self, guest_paddr: u64, host_paddr: u64, flags: u64) {
-        let mut table = unsafe { &mut *self.table };
+        let level3table = unsafe { &mut *self.table };
 
-        for level in (1..=3).rev() {
+        let table_entry = level3table.entry_by_addr(guest_paddr);
+        if !table_entry.is_valid() {
+            let new_table_ptr = Table::alloc();
+            *table_entry = PageEntry::new(new_table_ptr as u64, PTE_V);
+        }
+        let mut table = unsafe { &mut *(table_entry.paddr() as *mut Table) };
+
+        for level in (1..=2).rev() {
             let entry = table.entry_by_addr(guest_paddr, level);
             if !entry.is_valid() {
                 let new_table_ptr = Table::alloc();
@@ -87,9 +115,16 @@ impl GuestPageTable {
     }
 
     pub fn map_and_allocate(&self, guest_paddr: u64, size: usize, flags: u64) {
-        let mut table = unsafe { &mut *self.table };
+        let level3table = unsafe { &mut *self.table };
 
-        for level in (1..=3).rev() {
+        let table_entry = level3table.entry_by_addr(guest_paddr);
+        if !table_entry.is_valid() {
+            let new_table_ptr = Table::alloc();
+            *table_entry = PageEntry::new(new_table_ptr as u64, PTE_V);
+        }
+        let mut table = unsafe { &mut *(table_entry.paddr() as *mut Table) };
+
+        for level in (1..=2).rev() {
             let entry = table.entry_by_addr(guest_paddr, level);
             if !entry.is_valid() {
                 let new_table_ptr = Table::alloc();
