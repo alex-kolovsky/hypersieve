@@ -53,6 +53,7 @@ pub static GUESTS: [Guest; {}] = [
         writeln!(
             guest_constants_path,
             "Guest {{
+    page_table: spin::Mutex::new(crate::guest_table::GuestPageTable::empty()),
     entry_gpa: {},
     active_hart_count: core::sync::atomic::AtomicUsize::new(0),
     active_assigned_hart_count: core::sync::atomic::AtomicUsize::new(0),

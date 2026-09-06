@@ -42,6 +42,7 @@ impl Table {
     }
 }
 
+#[derive(Debug)]
 pub struct GuestPageTable {
     table: *mut Table,
 }
@@ -50,6 +51,12 @@ impl GuestPageTable {
     pub fn new() -> Self {
         Self {
             table: Table::alloc(),
+        }
+    }
+
+    pub const fn empty() -> Self {
+        Self {
+            table: core::ptr::null_mut(),
         }
     }
 

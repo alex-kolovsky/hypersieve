@@ -11,6 +11,7 @@ use core::{
 
 #[derive(Debug)]
 pub struct Guest {
+    pub page_table: spin::Mutex<GuestPageTable>,
     pub entry_gpa: usize,
     pub vcpu_ptrs: spin::Mutex<[Option<*mut Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
@@ -30,7 +31,7 @@ pub fn allocate_guest_memory(
     guest_entry_gpa: usize,
     image: &'static [u8],
     virtual_hart_id: u64,
-) -> Vcpu {
+) -> (Vcpu, GuestPageTable) {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
     let dst = kernel_memory;
@@ -47,7 +48,10 @@ pub fn allocate_guest_memory(
         PTE_R | PTE_W | PTE_X,
     );
 
-    Vcpu::new(&table, guest_entry_gpa as u64, virtual_hart_id)
+    (
+        Vcpu::new(&table, guest_entry_gpa as u64, virtual_hart_id),
+        table,
+    )
 }
 
 pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()> {
@@ -119,7 +123,11 @@ pub fn initialize_guests() {
                     let vcpu: *mut Vcpu = vcpu_ref as *mut Vcpu;
 
                     // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
-                    *vcpu = allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
+                    let page_table;
+                    (*vcpu, page_table) =
+                        allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
+
+                    *guest.page_table.lock() = page_table;
 
                     // Load this vcpu pointer into guest.vcpu_ptrs[i].
                     let mut vcpu_ptr = guest.vcpu_ptrs.lock();
