@@ -85,4 +85,28 @@ impl GuestPageTable {
         assert!(!entry.is_valid(), "already mapped");
         *entry = PageEntry::new(host_paddr, flags | PTE_V | PTE_U);
     }
+
+    pub fn map_and_allocate(&self, guest_paddr: u64, size: usize, flags: u64) {
+        let mut table = unsafe { &mut *self.table };
+
+        for level in (1..=3).rev() {
+            let entry = table.entry_by_addr(guest_paddr, level);
+            if !entry.is_valid() {
+                let new_table_ptr = Table::alloc();
+                *entry = PageEntry::new(new_table_ptr as u64, PTE_V);
+            }
+
+            table = unsafe { &mut *(entry.paddr() as *mut Table) };
+        }
+
+        let entry = table.entry_by_addr(guest_paddr, 0);
+        if !entry.is_valid() {
+            *entry = PageEntry::new(
+                crate::allocator::alloc_pages(size) as u64,
+                flags | PTE_V | PTE_U,
+            );
+        } else {
+            crate::println!("Already mapped");
+        }
+    }
 }
