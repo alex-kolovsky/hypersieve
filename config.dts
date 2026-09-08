@@ -20,7 +20,7 @@
         vm1 {
             path = "target/guest-2/guest-2.bin";
 
-            hart-capacity = <1>;
+            hart-capacity = <2>;
 
             entry = <0x100000>;
         };

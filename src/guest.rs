@@ -48,10 +48,7 @@ pub fn allocate_guest_memory(
         PTE_R | PTE_W | PTE_X,
     );
 
-    (
-        Vcpu::new(&table, guest_entry_gpa as u64, virtual_hart_id),
-        table,
-    )
+    (Vcpu::new(guest_entry_gpa as u64, virtual_hart_id), table)
 }
 
 pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()> {

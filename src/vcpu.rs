@@ -258,11 +258,7 @@ impl Vcpu {
             f31: 0.0,
         }
     }
-    pub fn new(
-        table: &crate::guest_table::GuestPageTable,
-        guest_entry: u64,
-        virtual_hart_id: u64,
-    ) -> Self {
+    pub fn new(guest_entry: u64, virtual_hart_id: u64) -> Self {
         // Set the XLEN for VS-mode (VSXL bitfield) to 64 bits in hstatus.
         let hstatus_vsxl: u64 = 2 << 32;
         // Set Supervisor Previous Virtualization (SPV) to 1 so the sret instruction boots the CPU into virtual mode.
@@ -286,7 +282,6 @@ impl Vcpu {
 
         Self {
             hstatus,
-            hgatp: table.hgatp(),
             sstatus,
             sepc: guest_entry,
             host_sp,
@@ -398,6 +393,10 @@ impl Vcpu {
     pub fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
         let time = read_csr!("time");
         let vstimecmp = time + TIMER_OFFSET;
+
+        let page_table = GUESTS[guest_id_for_hart].page_table.lock();
+        self.hgatp = page_table.hgatp();
+        drop(page_table);
 
         self.guest_id_for_hart = guest_id_for_hart;
         self.host_hart_id = host_hart_id;
