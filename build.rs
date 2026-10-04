@@ -31,11 +31,16 @@ pub struct Hart {
 
 fn main() {
     println!("cargo:rerun-if-changed=config.dts");
+    println!("cargo:rerun-if-changed=hardware.dts");
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
-    // Compile and parse the device tree file.
-    let mut hypervisor_configuration = build_modules::dts_parser::parse_dts(out_dir.as_str());
+    // Compile and parse the main device tree file.
+    let mut hypervisor_configuration = build_modules::main_dts_parser::parse_dts(out_dir.as_str());
+
+    // Compile and parse the hardware device tree file.
+    let (passthrough_memory_peripherals, emulate_memory_peripherals) =
+        build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
 
     // Generate vector extension support file.
     build_modules::vector_extension_support::generate_vector_extension_support(

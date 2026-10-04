@@ -14,8 +14,7 @@ pub struct HypervisorConfiguration {
     pub floating_point_extension: bool,
 }
 
-pub fn compile_dts(dtb_output_path: &std::path::PathBuf) {
-    let dts_source_path = "config.dts";
+pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
 
     let dtc_output = std::process::Command::new("dtc")
         // Input format.
@@ -44,7 +43,7 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
 
     // Compile Device Tree file.
-    compile_dts(&dtb_output_path);
+    compile_dts(&dtb_output_path, "config.dts");
 
     // Parse Device Tree Binary file.
     let dtb_data = std::fs::read(dtb_output_path).unwrap();

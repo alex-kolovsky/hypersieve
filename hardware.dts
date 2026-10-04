@@ -1,0 +1,14 @@
+/dts-v1/;
+
+/ {
+    #address-cells = <2>;
+    #size-cells = <2>;
+
+	soc {
+		uart: serial@10000000  {
+            compatible = "ns16550a";
+			reg = <0x0 0x10000000 0x0 0x1000>;
+			memory-policy = "passthrough";
+		};
+	};
+};
