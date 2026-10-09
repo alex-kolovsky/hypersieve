@@ -62,5 +62,18 @@ pub fn parse_dts(out_dir: &str) -> (Vec<u64>, HashMap<Vec<String>, Vec<u64>>) {
             }
         }
     }
+    sort_memory_peripherals_addrs(&mut passthrough_memory_peripherals);
+    sort_memory_peripherals_addrs(
+        &mut emulate_memory_peripherals
+            .values()
+            .flatten()
+            .copied()
+            .collect(),
+    );
     (passthrough_memory_peripherals, emulate_memory_peripherals)
+}
+
+fn sort_memory_peripherals_addrs(memory_peripherals: &mut Vec<u64>) {
+    let mut chunks: Vec<&mut [u64]> = memory_peripherals.chunks_mut(2).collect();
+    chunks.sort_by_key(|chunk| chunk[0]);
 }

@@ -14,6 +14,8 @@
             hart-capacity = <2>;
             assigned-harts = <0 1>;
 
+            allowed-mmio = <0x0 0x10000000 0x0 0x1 >;
+
             entry = <0x0>;
         };
 
@@ -21,6 +23,7 @@
             path = "target/guest-2/guest-2.bin";
 
             hart-capacity = <2>;
+            allowed-mmio = <0x0 0x10000000 0x0 0x1>;
 
             entry = <0x100000>;
         };

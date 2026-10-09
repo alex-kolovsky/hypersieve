@@ -1,6 +1,7 @@
 use crate::Guest;
 use crate::Hart;
 
+#[derive(Debug)]
 pub struct HypervisorConfiguration {
     pub guests: Vec<Guest>,
     pub harts: Vec<Hart>,
@@ -15,7 +16,6 @@ pub struct HypervisorConfiguration {
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
-
     let dtc_output = std::process::Command::new("dtc")
         // Input format.
         .arg("-I")
@@ -39,7 +39,10 @@ pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) 
     }
 }
 
-pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
+pub fn parse_dts(
+    out_dir: &str,
+    passthrough_memory_peripherals: Vec<u64>,
+) -> HypervisorConfiguration {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
 
     // Compile Device Tree file.
@@ -86,6 +89,18 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
                 .as_usize()
                 .unwrap();
 
+            let allowed_mmio_raw = guest
+                .property("allowed-mmio")
+                .expect("No allowed-mmio field in the hardware DTS");
+
+            let mut allowed_mmio = Vec::new();
+            let (chunks, _remainder) = allowed_mmio_raw.value.as_chunks::<8>();
+
+            for bytes in chunks.iter() {
+                let addr: u64 = u64::from_be_bytes(*bytes);
+                allowed_mmio.push(addr);
+            }
+
             let path = guest
                 .property("path")
                 .expect("No path field in DTS")
@@ -95,6 +110,9 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
             if !std::path::Path::exists(std::path::Path::new(path)) {
                 panic!("Guest file {path} not found");
             }
+
+            let passthrough_mmio_addrs =
+                get_allowed_passthrough_mmio_addrs(&passthrough_memory_peripherals, &allowed_mmio);
 
             total_hart_capacity += hart_capacity;
 
@@ -138,11 +156,18 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
                     hart_capacity,
                     guest_assigned_harts,
                     String::from(path),
+                    passthrough_mmio_addrs,
                 );
 
                 guests.push(guest_entry);
             } else {
-                let guest_entry = Guest::new(entry, hart_capacity, Vec::new(), String::from(path));
+                let guest_entry = Guest::new(
+                    entry,
+                    hart_capacity,
+                    Vec::new(),
+                    String::from(path),
+                    passthrough_mmio_addrs,
+                );
                 guests.push(guest_entry);
             }
         }
@@ -175,4 +200,33 @@ pub fn parse_dts(out_dir: &str) -> HypervisorConfiguration {
         vlen,
         floating_point_extension,
     }
+}
+
+fn get_allowed_passthrough_mmio_addrs(
+    // All MMIO regions in the system with "passthrough" policy.
+    passthrough_mmio_addrs: &Vec<u64>,
+    // All MMIO regions allowed to access in the system.
+    allowed_addrs: &Vec<u64>,
+) -> Vec<u64> {
+    let mut allowed_passthrough_mmio_addrs: Vec<u64> = Vec::new();
+    let mut i = 0;
+    let mut p_i = 0;
+    while i < allowed_addrs.len() && p_i < passthrough_mmio_addrs.len() {
+        let addr = allowed_addrs[i];
+        let size = allowed_addrs[i + 1];
+
+        let p_addr = passthrough_mmio_addrs[p_i];
+        let p_size = passthrough_mmio_addrs[p_i + 1];
+
+        // Add region if it belongs to an allowed zone.
+        if p_addr <= addr && (addr + size) <= (p_addr + p_size) {
+            allowed_passthrough_mmio_addrs.extend([addr, size]);
+            i += 2;
+        } else if p_addr + p_size <= addr {
+            p_i += 2;
+        } else {
+            i += 2;
+        }
+    }
+    allowed_passthrough_mmio_addrs
 }

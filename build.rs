@@ -1,11 +1,13 @@
 #[path = "build/mod.rs"]
 mod build_modules;
 
+#[derive(Debug)]
 struct Guest {
     entry_gpa: usize,
     hart_capacity: usize,
     assigned_harts: Vec<Option<u32>>,
     path: String,
+    passthrough_mmio_addrs: Vec<u64>,
 }
 impl Guest {
     fn new(
@@ -13,12 +15,14 @@ impl Guest {
         hart_capacity: usize,
         assigned_harts: Vec<Option<u32>>,
         path: String,
+        passthrough_mmio_addrs: Vec<u64>,
     ) -> Self {
         Self {
             entry_gpa,
             hart_capacity,
             assigned_harts,
             path,
+            passthrough_mmio_addrs,
         }
     }
 }
@@ -35,12 +39,13 @@ fn main() {
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
-    // Compile and parse the main device tree file.
-    let mut hypervisor_configuration = build_modules::main_dts_parser::parse_dts(out_dir.as_str());
-
     // Compile and parse the hardware device tree file.
-    let (passthrough_memory_peripherals, emulate_memory_peripherals) =
+    let (passthrough_memory_peripherals, _emulate_memory_peripherals) =
         build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
+
+    // Compile and parse the main device tree file.
+    let mut hypervisor_configuration =
+        build_modules::main_dts_parser::parse_dts(out_dir.as_str(), passthrough_memory_peripherals);
 
     // Generate vector extension support file.
     build_modules::vector_extension_support::generate_vector_extension_support(
