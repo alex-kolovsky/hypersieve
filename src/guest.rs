@@ -1,5 +1,6 @@
 use crate::{
-    GUESTS, MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST,
+    GUESTS, MAX_PASSTHROUGH_REGIONS_COUNT, MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST,
+    MAX_SUPPORTED_HARTS_PER_GUEST,
     allocator::alloc_pages,
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
     vcpu::Vcpu,
@@ -21,6 +22,7 @@ pub struct Guest {
     pub assigned_hart_capacity: usize,
     pub assigned_harts: [Option<u32>; MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST],
     pub data: &'static [u8],
+    pub passthrough_mmio_regions: [u64; MAX_PASSTHROUGH_REGIONS_COUNT],
 }
 
 // The Guest struct is thread-safe if we never change Option::None to Option::Some or vice versa after waking the harts up.

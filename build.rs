@@ -7,7 +7,7 @@ struct Guest {
     hart_capacity: usize,
     assigned_harts: Vec<Option<u32>>,
     path: String,
-    passthrough_mmio_addrs: Vec<u64>,
+    passthrough_mmio_regions: Vec<u64>,
 }
 impl Guest {
     fn new(
@@ -15,14 +15,14 @@ impl Guest {
         hart_capacity: usize,
         assigned_harts: Vec<Option<u32>>,
         path: String,
-        passthrough_mmio_addrs: Vec<u64>,
+        passthrough_mmio_regions: Vec<u64>,
     ) -> Self {
         Self {
             entry_gpa,
             hart_capacity,
             assigned_harts,
             path,
-            passthrough_mmio_addrs,
+            passthrough_mmio_regions,
         }
     }
 }
@@ -65,6 +65,7 @@ fn main() {
         &mut hypervisor_configuration.guests,
         hypervisor_configuration.max_supported_harts_per_guest,
         hypervisor_configuration.max_supported_assigned_harts_per_guest,
+        hypervisor_configuration.max_passthrough_mmio_regions_count,
     );
 
     // Generate hart constants file.
