@@ -25,6 +25,13 @@ pub const VLEN: usize = {vlen};
 #[unsafe(naked)]
 extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
+        // Store vector CSRs.
+        \"csrr t0, vl\",
+        \"sd t0, {{vl_offset}}(a0)\",
+        \"csrr t0, vtype\",
+        \"sd t0, {{vtype_offset}}(a0)\",
+
+        // Store general vector registers.
         \"csrr t1, vlenb\",
         \"li t0, {{v0_offset}}\",
         \"add t0, t0, a0\",
@@ -93,12 +100,20 @@ extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vs1r.v v31, (t0)\",
         \"ret\",
         v0_offset = const offset_of!(crate::vcpu::Vcpu, v0),
+        vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
+        vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
 }}
 
 #[unsafe(naked)]
 extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
+        // Load vector CSRs.
+        \"ld t0, {{vl_offset}}(a0)\",
+        \"ld t1, {{vtype_offset}}(a0)\",
+        \"vsetvl x0, t0, t1\",
+
+        // Load general vector registers.
         \"csrr t1, vlenb\",
         \"li t0, {{v0_offset}}\",
         \"add t0, t0, a0\",
@@ -167,6 +182,8 @@ extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vl1r.v v31, (t0)\",
         \"ret\",
         v0_offset = const offset_of!(crate::vcpu::Vcpu, v0),
+        vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
+        vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
 }}"
     )

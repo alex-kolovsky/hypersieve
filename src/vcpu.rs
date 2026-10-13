@@ -96,6 +96,10 @@ pub struct Vcpu {
     pub v30: [u32; VLEN / 32],
     pub v31: [u32; VLEN / 32],
 
+    // Vector CSRs
+    pub vtype: u64,
+    pub vl: u64,
+
     // Floating-point registers
     pub f0: f64,
     pub f1: f64,
@@ -188,6 +192,8 @@ impl Vcpu {
             vsie: 0,
             vsatp: 0,
             vstimecmp: 0,
+            vtype: 0,
+            vl: 0,
 
             // Vector registers
             v0: [0; VLEN / 32],
@@ -378,11 +384,7 @@ impl Vcpu {
     }
 
     pub fn run(&mut self) -> ! {
-        // Restore vector registers.
-        crate::restore_vector_registers(self as *mut Vcpu);
-
-        // Restore floating-point registers.
-        crate::restore_floating_point_registers(self as *mut Vcpu);
+        restore_extension_registers(self as *mut Vcpu);
 
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
@@ -391,9 +393,11 @@ impl Vcpu {
         unreachable!();
     }
     pub fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
+        // Set guest supervisor timer compare value.
         let time = read_csr!("time");
         let vstimecmp = time + TIMER_OFFSET;
 
+        // Configure hgatp to enforce the guest physical memory mapping.
         let page_table = GUESTS[guest_id_for_hart].page_table.lock();
         self.hgatp = page_table.hgatp();
         drop(page_table);
@@ -539,4 +543,17 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
         t5_offset = const offset_of!(Vcpu, t5),
         t6_offset = const offset_of!(Vcpu, t6),
     );
+}
+
+fn restore_extension_registers(vcpu_ptr: *mut Vcpu) {
+    let vcpu_ref = unsafe { &(*vcpu_ptr) };
+    if (vcpu_ref.vsstatus & ((1 << 9) | (1 << 10))) != 0 {
+        // Restore vector registers.
+        crate::restore_vector_registers(vcpu_ptr);
+    }
+
+    if (vcpu_ref.vsstatus & ((1 << 14) | (1 << 13))) != 0 {
+        // Restore floating-point registers.
+        crate::restore_floating_point_registers(vcpu_ptr);
+    }
 }
