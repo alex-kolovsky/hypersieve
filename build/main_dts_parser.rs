@@ -11,6 +11,7 @@ pub struct HypervisorConfiguration {
     pub max_supported_harts_per_guest: usize,
     pub max_supported_assigned_harts_per_guest: usize,
     pub max_passthrough_mmio_regions_count: usize,
+    pub max_aligned_passthrough_mmio_regions_count: usize,
 
     pub vlen: usize,
     pub floating_point_extension: bool,
@@ -59,6 +60,7 @@ pub fn parse_dts(
     let mut max_supported_assigned_harts_per_guest: usize = 0;
 
     let mut max_passthrough_mmio_regions_count: usize = 0;
+    let mut max_aligned_passthrough_mmio_regions_count: usize = 0;
 
     // Total hart capacity allocated across all guest VMs.
     let mut total_hart_capacity: usize = 0;
@@ -115,13 +117,18 @@ pub fn parse_dts(
                 panic!("Guest file {path} not found");
             }
 
-            let passthrough_mmio_regions = get_allowed_passthrough_mmio_regions(
-                &passthrough_memory_peripherals,
-                &allowed_mmio,
-            );
+            let (aligned_passthrough_mmio_regions, passthrough_mmio_regions) =
+                get_allowed_passthrough_mmio_regions(
+                    &passthrough_memory_peripherals,
+                    &allowed_mmio,
+                );
 
             if passthrough_mmio_regions.len() > max_passthrough_mmio_regions_count {
                 max_passthrough_mmio_regions_count = passthrough_mmio_regions.len();
+            }
+
+            if aligned_passthrough_mmio_regions.len() > max_aligned_passthrough_mmio_regions_count {
+                max_aligned_passthrough_mmio_regions_count = aligned_passthrough_mmio_regions.len();
             }
 
             total_hart_capacity += hart_capacity;
@@ -166,6 +173,7 @@ pub fn parse_dts(
                     hart_capacity,
                     guest_assigned_harts,
                     String::from(path),
+                    aligned_passthrough_mmio_regions,
                     passthrough_mmio_regions,
                 );
 
@@ -176,6 +184,7 @@ pub fn parse_dts(
                     hart_capacity,
                     Vec::new(),
                     String::from(path),
+                    aligned_passthrough_mmio_regions,
                     passthrough_mmio_regions,
                 );
                 guests.push(guest_entry);
@@ -206,6 +215,7 @@ pub fn parse_dts(
         max_supported_harts_per_guest,
         max_supported_assigned_harts_per_guest,
         max_passthrough_mmio_regions_count,
+        max_aligned_passthrough_mmio_regions_count,
         harts,
         total_hart_capacity,
         vlen,
@@ -218,8 +228,10 @@ fn get_allowed_passthrough_mmio_regions(
     passthrough_mmio_regions: &[[u64; 2]],
     // All MMIO regions allowed to access in the system.
     allowed_addrs: &[[u64; 2]],
-) -> Vec<[u64; 2]> {
+) -> (Vec<[u64; 2]>, Vec<[u64; 2]>) {
     let mut allowed_passthrough_mmio_addrs: Vec<[u64; 2]> = Vec::new();
+    let mut allowed_aligned_passthrough_mmio_addrs: Vec<[u64; 2]> = Vec::new();
+
     let mut i = 0;
     let mut p_i = 0;
     while i < allowed_addrs.len() && p_i < passthrough_mmio_regions.len() {
@@ -231,7 +243,12 @@ fn get_allowed_passthrough_mmio_regions(
 
         // Add region if it belongs to an allowed zone.
         if p_addr <= addr && (addr + size) <= (p_addr + p_size) {
-            allowed_passthrough_mmio_addrs.push([addr, size]);
+            // Check if the address is 4 KiB page-aligned
+            if (addr & 4095) == 0 && (size & 4095) == 0 {
+                allowed_aligned_passthrough_mmio_addrs.push([addr, size]);
+            } else {
+                allowed_passthrough_mmio_addrs.push([addr, size]);
+            }
             i += 1;
         } else if p_addr + p_size <= addr {
             p_i += 1;
@@ -239,5 +256,8 @@ fn get_allowed_passthrough_mmio_regions(
             i += 1;
         }
     }
-    allowed_passthrough_mmio_addrs
+    (
+        allowed_aligned_passthrough_mmio_addrs,
+        allowed_passthrough_mmio_addrs,
+    )
 }

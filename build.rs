@@ -7,6 +7,7 @@ struct Guest {
     hart_capacity: usize,
     assigned_harts: Vec<Option<u32>>,
     path: String,
+    aligned_passthrough_mmio_regions: Vec<[u64; 2]>,
     passthrough_mmio_regions: Vec<[u64; 2]>,
 }
 impl Guest {
@@ -15,6 +16,7 @@ impl Guest {
         hart_capacity: usize,
         assigned_harts: Vec<Option<u32>>,
         path: String,
+        aligned_passthrough_mmio_regions: Vec<[u64; 2]>,
         passthrough_mmio_regions: Vec<[u64; 2]>,
     ) -> Self {
         Self {
@@ -23,6 +25,7 @@ impl Guest {
             assigned_harts,
             path,
             passthrough_mmio_regions,
+            aligned_passthrough_mmio_regions,
         }
     }
 }
@@ -65,6 +68,7 @@ fn main() {
         &mut hypervisor_configuration.guests,
         hypervisor_configuration.max_supported_harts_per_guest,
         hypervisor_configuration.max_supported_assigned_harts_per_guest,
+        hypervisor_configuration.max_aligned_passthrough_mmio_regions_count,
         hypervisor_configuration.max_passthrough_mmio_regions_count,
     );
 

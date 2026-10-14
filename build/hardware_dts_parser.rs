@@ -14,6 +14,7 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
     // The even-indexed array elements are the MMIO start addresses,
     // and the odd-indexed ones are the end sizes.
     let mut passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
+    let mut aligned_passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
     let mut emulate_memory_peripherals: HashMap<Vec<String>, Vec<[u64; 2]>> = HashMap::new();
 
     if let Some(soc) = fdt.find_node("/soc") {
@@ -34,7 +35,7 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
                 .collect();
 
             // Extract addresses of peripheral (reg).
-            let mut reg_addresses = Vec::new();
+            let mut reg_addrs: Vec<[u64; 2]> = Vec::new();
 
             let reg = peripheral
                 .property("reg")
@@ -51,13 +52,13 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
             for bytes in chunks.chunks(2) {
                 let addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
-                reg_addresses.push([addr, size]);
+                reg_addrs.push([addr, size]);
             }
 
             if memory_policy_str == "emulate" {
-                emulate_memory_peripherals.insert(compatible, reg_addresses);
+                emulate_memory_peripherals.insert(compatible, reg_addrs);
             } else if memory_policy_str == "passthrough" {
-                passthrough_memory_peripherals.extend(reg_addresses.iter());
+                passthrough_memory_peripherals.extend(reg_addrs.iter());
             } else {
                 panic!("Unsupported memory policy");
             }
