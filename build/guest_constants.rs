@@ -43,7 +43,7 @@ pub static GUESTS: [Guest; {}] = [
         }
 
         guest.passthrough_mmio_regions.extend(vec![
-            0x0;
+            [0x0, 0x0];
             max_passthrough_mmio_regions_count
                 - guest.passthrough_mmio_regions.len()
         ]);

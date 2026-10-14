@@ -7,7 +7,7 @@ struct Guest {
     hart_capacity: usize,
     assigned_harts: Vec<Option<u32>>,
     path: String,
-    passthrough_mmio_regions: Vec<u64>,
+    passthrough_mmio_regions: Vec<[u64; 2]>,
 }
 impl Guest {
     fn new(
@@ -15,7 +15,7 @@ impl Guest {
         hart_capacity: usize,
         assigned_harts: Vec<Option<u32>>,
         path: String,
-        passthrough_mmio_regions: Vec<u64>,
+        passthrough_mmio_regions: Vec<[u64; 2]>,
     ) -> Self {
         Self {
             entry_gpa,

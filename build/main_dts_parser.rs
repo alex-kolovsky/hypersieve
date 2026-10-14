@@ -42,7 +42,7 @@ pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) 
 
 pub fn parse_dts(
     out_dir: &str,
-    passthrough_memory_peripherals: Vec<u64>,
+    passthrough_memory_peripherals: Vec<[u64; 2]>,
 ) -> HypervisorConfiguration {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
 
@@ -99,9 +99,10 @@ pub fn parse_dts(
             let mut allowed_mmio = Vec::new();
             let (chunks, _remainder) = allowed_mmio_raw.value.as_chunks::<8>();
 
-            for bytes in chunks.iter() {
-                let addr: u64 = u64::from_be_bytes(*bytes);
-                allowed_mmio.push(addr);
+            for bytes in chunks.chunks(2) {
+                let addr: u64 = u64::from_be_bytes(bytes[0]);
+                let size: u64 = u64::from_be_bytes(bytes[1]);
+                allowed_mmio.push([addr, size]);
             }
 
             let path = guest
@@ -214,28 +215,28 @@ pub fn parse_dts(
 
 fn get_allowed_passthrough_mmio_regions(
     // All MMIO regions in the system with "passthrough" policy.
-    passthrough_mmio_regions: &[u64],
+    passthrough_mmio_regions: &[[u64; 2]],
     // All MMIO regions allowed to access in the system.
-    allowed_addrs: &[u64],
-) -> Vec<u64> {
-    let mut allowed_passthrough_mmio_addrs: Vec<u64> = Vec::new();
+    allowed_addrs: &[[u64; 2]],
+) -> Vec<[u64; 2]> {
+    let mut allowed_passthrough_mmio_addrs: Vec<[u64; 2]> = Vec::new();
     let mut i = 0;
     let mut p_i = 0;
     while i < allowed_addrs.len() && p_i < passthrough_mmio_regions.len() {
-        let addr = allowed_addrs[i];
-        let size = allowed_addrs[i + 1];
+        let addr = allowed_addrs[i][0];
+        let size = allowed_addrs[i][1];
 
-        let p_addr = passthrough_mmio_regions[p_i];
-        let p_size = passthrough_mmio_regions[p_i + 1];
+        let p_addr = passthrough_mmio_regions[p_i][0];
+        let p_size = passthrough_mmio_regions[p_i][1];
 
         // Add region if it belongs to an allowed zone.
         if p_addr <= addr && (addr + size) <= (p_addr + p_size) {
-            allowed_passthrough_mmio_addrs.extend([addr, size]);
-            i += 2;
+            allowed_passthrough_mmio_addrs.push([addr, size]);
+            i += 1;
         } else if p_addr + p_size <= addr {
-            p_i += 2;
+            p_i += 1;
         } else {
-            i += 2;
+            i += 1;
         }
     }
     allowed_passthrough_mmio_addrs

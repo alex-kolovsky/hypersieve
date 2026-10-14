@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub fn parse_dts(out_dir: &str) -> (Vec<u64>, HashMap<Vec<String>, Vec<u64>>) {
+pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64; 2]>>) {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("hardware.dtb");
 
     // Compile Device Tree file.
@@ -13,8 +13,8 @@ pub fn parse_dts(out_dir: &str) -> (Vec<u64>, HashMap<Vec<String>, Vec<u64>>) {
 
     // The even-indexed array elements are the MMIO start addresses,
     // and the odd-indexed ones are the end sizes.
-    let mut passthrough_memory_peripherals: Vec<u64> = Vec::new();
-    let mut emulate_memory_peripherals: HashMap<Vec<String>, Vec<u64>> = HashMap::new();
+    let mut passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
+    let mut emulate_memory_peripherals: HashMap<Vec<String>, Vec<[u64; 2]>> = HashMap::new();
 
     if let Some(soc) = fdt.find_node("/soc") {
         for peripheral in soc.children() {
@@ -48,9 +48,10 @@ pub fn parse_dts(out_dir: &str) -> (Vec<u64>, HashMap<Vec<String>, Vec<u64>>) {
 
             let (chunks, _remainder) = reg_raw.as_chunks::<8>();
 
-            for bytes in chunks.iter() {
-                let hart_id: u64 = u64::from_be_bytes(*bytes);
-                reg_addresses.push(hart_id);
+            for bytes in chunks.chunks(2) {
+                let addr: u64 = u64::from_be_bytes(bytes[0]);
+                let size: u64 = u64::from_be_bytes(bytes[1]);
+                reg_addresses.push([addr, size]);
             }
 
             if memory_policy_str == "emulate" {
@@ -62,18 +63,6 @@ pub fn parse_dts(out_dir: &str) -> (Vec<u64>, HashMap<Vec<String>, Vec<u64>>) {
             }
         }
     }
-    sort_memory_peripherals_addrs(&mut passthrough_memory_peripherals);
-    sort_memory_peripherals_addrs(
-        &mut emulate_memory_peripherals
-            .values()
-            .flatten()
-            .copied()
-            .collect(),
-    );
+    passthrough_memory_peripherals.sort_by_key(|chunk| chunk[0]);
     (passthrough_memory_peripherals, emulate_memory_peripherals)
-}
-
-fn sort_memory_peripherals_addrs(memory_peripherals: &mut Vec<u64>) {
-    let mut chunks: Vec<&mut [u64]> = memory_peripherals.chunks_mut(2).collect();
-    chunks.sort_by_key(|chunk| chunk[0]);
 }
