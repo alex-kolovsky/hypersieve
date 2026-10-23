@@ -127,10 +127,9 @@ pub fn initialize_guests() {
                     (*vcpu, page_table) =
                         allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
 
-                    // Initialize passthrough MMIO addresses.
+                    // Initialize aligned MMIO addresses.
                     for addr in guest.aligned_passthrough_mmio_regions {
                         if addr[0] != 0 {
-                            crate::println!("{}", addr[0]);
                             page_table.map(addr[0], addr[0], PTE_R | PTE_W);
                         }
                     }

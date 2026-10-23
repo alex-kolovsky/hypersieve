@@ -7,11 +7,8 @@ use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Orde
 #[repr(align(8))]
 #[derive(Debug, Default)]
 pub struct Vcpu {
-    pub host_hart_id: usize,
-    pub guest_id_for_hart: usize,
-    // Host registers
-    pub host_sp: u64,
     // General purpose registers
+    pub zero: u64,
     pub ra: u64,
     pub sp: u64,
     pub gp: u64,
@@ -43,6 +40,11 @@ pub struct Vcpu {
     pub t4: u64,
     pub t5: u64,
     pub t6: u64,
+
+    pub host_hart_id: usize,
+    pub guest_id_for_hart: usize,
+    // Host registers
+    pub host_sp: u64,
 
     // CSRs
     pub hstatus: u64,
@@ -143,6 +145,7 @@ impl Vcpu {
             // Host registers
             host_sp: 0,
             // General purpose registers
+            zero: 0,
             ra: 0,
             sp: 0,
             gp: 0,

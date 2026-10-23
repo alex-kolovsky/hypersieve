@@ -18,6 +18,11 @@ SECTIONS {
   .data : ALIGN(8) {
     *(.data .data.*);
     *(.sdata .sdata.*)
+    __registers_load = .;
+    . += 4 * 28;
+    . = ALIGN(8);
+    __register_values = .;
+    . += 8 * 3;
   } > HYP_MEM
 
   .bss (NOLOAD) : ALIGN(8) {
