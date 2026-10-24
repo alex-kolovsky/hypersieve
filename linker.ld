@@ -18,6 +18,9 @@ SECTIONS {
   .data : ALIGN(8) {
     *(.data .data.*);
     *(.sdata .sdata.*)
+  } > HYP_MEM
+
+  .buffer : ALIGN(8) {
     __registers_load = .;
     . += 4 * 28;
     . = ALIGN(8);
