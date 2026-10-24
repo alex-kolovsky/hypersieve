@@ -5,20 +5,37 @@
     #size-cells = <1>;
 
     hypervisor-config {
+        // Size of the vector registers.
+        // To turn off the vector extension,
+        // set the vlen-size parameter to zero.
         vlen-size = <128>;
+
+        // Enables the floating-point extension;
+        // comment out or delete this parameter to disable it.
         floating-point-extension;
 
+        // Configuration for the first guest VM.
         vm0 {
+            // Path of the guest binary.
             path = "target/guest-1/guest-1.bin";
 
+            // Maximum number of harts per guest.
             hart-capacity = <2>;
+
+            // Assigned Hart IDs.
+            // Comment out or delete this parameter if you don't need to assign Harts.
             assigned-harts = <0 1>;
 
+            // Allowed to read and write MMIO peripherals.
+			// Elements 0-1: MMIO base address
+			// Elements 2-3: Size
             allowed-mmio = <0x0 0x10000000 0x0 0x1 >;
 
+            // Virtual address of the guest entry.
             entry = <0x0>;
         };
 
+        // Configuration for the second guest VM.
         vm1 {
             path = "target/guest-2/guest-2.bin";
 

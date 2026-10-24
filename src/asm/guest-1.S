@@ -1,30 +1,38 @@
 .section .text
 .global guest_boot
 
-li a7, 0x01
+# If the Hart ID is non-zero, this is a secondary Hart.
+bnez a0, second_hart
 
+first_hart:
 
-bnez a0, second_vcpu
+    # Load the legacy putchar extension ID
+    # into the ecall extension register (a7).
+    li a7, 0x01
 
-first_vcpu:
-
+    # Configure vector registers to a 32-bit width per register.
     li t0, 1
     vsetvli t1, t0, e32, m1, ta, ma
+
+    # Load the ASCII character 'V' into the v31 register.
     li t0, 'V'
     vmv.v.x v31, t0
 
-    first_vcpu_loop:
+    first_hart_loop:
 
+    # Move the character from v31 to a0 and print it to the screen.
     vmv.x.s a0, v31
+
+    # It tests the save-and-restore logic of the vector extension.
     ecall
 
+    j first_hart_loop
 
-    j first_vcpu_loop
+second_hart:
 
-second_vcpu:
-
+    # Write the ASCII character 'U' into the UART.
     li a0, 'U'
     li a1, 0x10000000
     sw a0, 0(a1)
 
-    j second_vcpu
+    j second_hart

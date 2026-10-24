@@ -7,7 +7,11 @@
 	soc {
 		uart: serial@10000000  {
             compatible = "ns16550a";
+			// Elements 0-1: MMIO base address
+			// Elements 2-3: Size
 			reg = <0x0 0x10000000 0x0 0x1000>;
+
+			// Memory policy; either 'passthrough' or 'emulate'.
 			memory-policy = "passthrough";
 		};
 	};
