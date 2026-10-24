@@ -26,6 +26,7 @@ SECTIONS {
     . = ALIGN(8);
     __register_values = .;
     . += 8 * 3;
+    . += 4096;
   } > HYP_MEM
 
   .bss (NOLOAD) : ALIGN(8) {

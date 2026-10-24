@@ -1,4 +1,4 @@
-use crate::{println, vcpu::Vcpu};
+use crate::vcpu::Vcpu;
 use core::{
     arch::{asm, naked_asm},
     mem::offset_of,
@@ -257,14 +257,28 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
                 // If the lowest two bits are 0b11, the instruction is 4 bytes; otherwise, it is 2 bytes.
                 let instruction_size = 2 + (((instruction & 0b10) >> 1) & (instruction & 0b01)) * 2;
 
+                // Each Hart has its own buffer; its address is related to the Hart ID.
+                // Uses a 34-byte offset instead of the actual 33-byte buffer size to maintain alignment.
+                let buffer_offset = 34 * 4 * vcpu_ref.host_hart_id;
+                let registers_load =
+                    (&raw const __registers_load as usize + buffer_offset) as *mut [u32; 27];
+                let register_values =
+                    (&raw const __register_values as usize + buffer_offset) as *mut [u64; 3];
+
                 // Create an instruction sequence to perform the store requested by the guest.
                 unsafe {
-                    create_guest_store_sequence(instruction, instruction_size, vcpu);
+                    create_guest_store_sequence(
+                        instruction,
+                        instruction_size,
+                        vcpu,
+                        registers_load,
+                        register_values,
+                    );
                 }
 
                 // Execute the instruction sequence.
                 unsafe {
-                    asm!("fence.i", "jalr x1, 0({})", in(reg) core::ptr::addr_of!(__registers_load) as *mut [u32; 5], out("x1") _, );
+                    asm!("fence.i", "jalr x1, 0({})", in(reg) registers_load as u64, out("x1") _, );
                 }
 
                 // Return to the guest.
@@ -352,7 +366,13 @@ fn scause_to_str<'a>(exception_code: &'a u64, interrupt_bit: &'a u64) -> &'a str
 /// This function is unsafe because it writes to RWX memory,
 /// which could potentially allow arbitrary code execution.
 #[inline(always)]
-unsafe fn create_guest_store_sequence(instruction: u32, instruction_size: u32, vcpu: *const Vcpu) {
+unsafe fn create_guest_store_sequence(
+    instruction: u32,
+    instruction_size: u32,
+    vcpu: *const Vcpu,
+    registers_load: *mut [u32; 27],
+    register_values: *mut [u64; 3],
+) {
     let is_instruction_compressed = (4 - instruction_size) >> 1;
 
     // If the instruction is compressed, a NOP instruction is added
@@ -402,7 +422,7 @@ unsafe fn create_guest_store_sequence(instruction: u32, instruction_size: u32, v
     // Write guest operands in memory to access them.
     unsafe {
         core::ptr::write_volatile(
-            &raw const __register_values as *mut [u64; 3],
+            register_values,
             [
                 (*gprs)[rd as usize],
                 (*gprs)[rs1 as usize],
@@ -416,11 +436,11 @@ unsafe fn create_guest_store_sequence(instruction: u32, instruction_size: u32, v
         (!(3u32 | (1u32 << rd) | (1u32 << rs1) | (1u32 << rs2) | (1u32 << 2))).trailing_zeros();
 
     // Calculate the PC-relative address for guest operands.
-    let pc_relative_values_addr = ((&raw const __register_values) as u64)
-        - ((&raw const __registers_load) as u64
+    let pc_relative_values_addr = (register_values as u64)
+        - ((registers_load as u64)
 
-                    // Add the size of the instructions that precede the auipc instruction.
-                         + 40u64);
+        // Add the size of the instructions that precede the auipc instruction.
+        + 40u64);
 
     // Safely perform the guest store instruction.
     let buffer: [u32; 27] = [
@@ -495,9 +515,6 @@ unsafe fn create_guest_store_sequence(instruction: u32, instruction_size: u32, v
 
     // Write the instruction sequence into the executable memory buffer.
     unsafe {
-        core::ptr::write_volatile(
-            core::ptr::addr_of!(__registers_load) as *mut [u32; 27],
-            buffer,
-        );
+        core::ptr::write_volatile(registers_load, buffer);
     }
 }
