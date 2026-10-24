@@ -22,7 +22,9 @@ first_vcpu:
     j first_vcpu_loop
 
 second_vcpu:
-    li a0, 'B'
-    ecall
+
+    li a0, 'U'
+    li a1, 0x10000000
+    sw a0, 0(a1)
 
     j second_vcpu
