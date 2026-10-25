@@ -70,6 +70,7 @@ fn main() {
         hypervisor_configuration.max_supported_assigned_harts_per_guest,
         hypervisor_configuration.max_aligned_passthrough_mmio_regions_count,
         hypervisor_configuration.max_passthrough_mmio_regions_count,
+        hypervisor_configuration.system_mmio_windows,
     );
 
     // Generate hart constants file.

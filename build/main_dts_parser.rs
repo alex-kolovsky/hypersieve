@@ -15,6 +15,7 @@ pub struct HypervisorConfiguration {
 
     pub vlen: usize,
     pub floating_point_extension: bool,
+    pub system_mmio_windows: Vec<[u64; 2]>,
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
@@ -68,6 +69,8 @@ pub fn parse_dts(
     let vlen: usize;
     let floating_point_extension: bool;
 
+    let mut system_mmio_windows: Vec<[u64; 2]> = Vec::new();
+
     let mut guests: Vec<Guest> = Vec::new();
     let fdt = fdt::Fdt::new(&dtb_data).unwrap();
     if let Some(hypervisor) = fdt.find_node("/hypervisor-config") {
@@ -79,6 +82,18 @@ pub fn parse_dts(
             .unwrap();
 
         floating_point_extension = hypervisor.property("floating-point-extension").is_some();
+
+        let system_mmio_windows_raw = hypervisor
+            .property("mmio-windows")
+            .expect("No mmio-windows property in DTS")
+            .value;
+        let (chunks, _remainder) = system_mmio_windows_raw.as_chunks::<8>();
+
+        for bytes in chunks.chunks(2) {
+            let base_addr: u64 = u64::from_be_bytes(bytes[0]);
+            let size: u64 = u64::from_be_bytes(bytes[1]);
+            system_mmio_windows.push([base_addr, size]);
+        }
 
         for guest in hypervisor.children() {
             // Extract the VM entry address.
@@ -155,6 +170,7 @@ pub fn parse_dts(
                     guest_assigned_harts.push(Some(hart_id));
                     max_supported_assigned_harts_per_guest += 1;
                 }
+
                 if harts.len() > hart_capacity {
                     panic!(
                         "Assigned harts count ({}) cannot be bigger than harts capacity ({hart_capacity})\nGuest name: {}",
@@ -220,6 +236,7 @@ pub fn parse_dts(
         total_hart_capacity,
         vlen,
         floating_point_extension,
+        system_mmio_windows,
     }
 }
 

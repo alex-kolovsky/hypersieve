@@ -7,6 +7,7 @@ pub fn generate_guest_constants(
     max_supported_assigned_harts_per_guest: usize,
     max_aligned_passthrough_mmio_regions_count: usize,
     max_passthrough_mmio_regions_count: usize,
+    system_mmio_windows: Vec<[u64; 2]>,
 ) {
     // Create the file path for the guest constants.
     let guest_constants_file_path = std::path::Path::new(out_dir).join("guest_constants.rs");
@@ -20,8 +21,11 @@ pub const MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST: usize = {max_supported_assigne
 pub const MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT: usize = {max_aligned_passthrough_mmio_regions_count};
 pub const MAX_PASSTHROUGH_REGIONS_COUNT: usize = {max_passthrough_mmio_regions_count};
 
+pub const SYSTEM_MMIO_WINDOWS: [[u64; 2]; {}] = {system_mmio_windows:#?};
+
 pub static GUESTS: [Guest; {}] = [
 ",
+        system_mmio_windows.len(),
         guests.len(),
     )
     .unwrap();

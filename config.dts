@@ -14,22 +14,33 @@
         // comment out or delete this parameter to disable it.
         floating-point-extension;
 
+        // All top-level MMIO windows in the system.
+        // Each window encompasses a broad peripheral cluster and the space between them.
+        // The greater the number of such windows, the slower the hypervisor becomes.
+        // Elements 0-1: MMIO base address (0x00000000_00000000)
+        // Elements 2-3: Size (0x00000000_70000000)
+     	mmio-windows = <0x0 0x0 0x0 0x70000000>;
+
         // Configuration for the first guest VM.
         vm0 {
             // Path of the guest binary.
             path = "target/guest-1/guest-1.bin";
 
-            // Maximum number of harts per guest.
+            // Maximum number of total Harts a guest can use, combining both assigned and shared Harts.
             hart-capacity = <2>;
 
             // Assigned Hart IDs.
+            // You can assign one Hart to more than one guest.
+            // Such Harts will only execute guests assigned to them.
             // Comment out or delete this parameter if you don't need to assign Harts.
             assigned-harts = <0 1>;
 
-            // Allowed to read and write MMIO peripherals.
-			// Elements 0-1: MMIO base address
-			// Elements 2-3: Size
-            allowed-mmio = <0x0 0x10000000 0x0 0x1 >;
+            // Allowed memory-mapped I/O peripherals.
+            // Elements 0-1: MMIO base address (e.g., UART base address)
+            // Elements 2-3: Size (The exact accessible byte-span of the registers)
+            // The greater the number of allowed MMIO regions, the slower the hypervisor becomes.
+            // If the base address and the size are not Page-Aligned, accessing them will be significantly slower.
+            allowed-mmio = <0x0 0x10000000 0x0 0x8>;
 
             // Virtual address of the guest entry.
             entry = <0x0>;
