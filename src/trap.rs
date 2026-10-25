@@ -1,6 +1,7 @@
 use crate::vcpu::Vcpu;
 use core::{
     arch::{asm, naked_asm},
+    cmp::Ordering,
     mem::offset_of,
 };
 const SXLEN: u8 = 64;
@@ -239,52 +240,58 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         let current_guest: &crate::Guest =
             crate::guest::get_current_guest(&host_hart_id, &guest_id_for_hart);
 
-        // TODO: Optimize using a branchless algorithm without loops.
         // If this is an allowed MMIO address, perform a write to it; otherwise, allocate a page.
-        for passthrough_mmio_addr in current_guest.passthrough_mmio_regions {
-            if passthrough_mmio_addr[0] <= requested_guest_addr
-                && requested_guest_addr <= (passthrough_mmio_addr[0] + passthrough_mmio_addr[1])
-            {
-                let executed_instruction_address: u64 = vcpu_ref.sepc;
-                let mut instruction: u32;
-
-                // Fetch an instruction by the address in stval.
-                unsafe {
-                    asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+        let search_result = current_guest
+            .passthrough_mmio_regions
+            .binary_search_by(|region| {
+                if requested_guest_addr < region[0] {
+                    Ordering::Greater
+                } else if requested_guest_addr > region[0] + region[1] {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
                 }
+            });
+        if search_result.is_ok() {
+            let executed_instruction_address: u64 = vcpu_ref.sepc;
+            let mut instruction: u32;
 
-                // Get an instruction size in bytes by processing the quadrant.
-                // If the lowest two bits are 0b11, the instruction is 4 bytes; otherwise, it is 2 bytes.
-                let instruction_size = 2 + (((instruction & 0b10) >> 1) & (instruction & 0b01)) * 2;
-
-                // Each Hart has its own buffer; its address is related to the Hart ID.
-                // Uses a 34-byte offset instead of the actual 33-byte buffer size to maintain alignment.
-                let buffer_offset = 34 * 4 * vcpu_ref.host_hart_id;
-                let registers_load =
-                    (&raw const __registers_load as usize + buffer_offset) as *mut [u32; 27];
-                let register_values =
-                    (&raw const __register_values as usize + buffer_offset) as *mut [u64; 3];
-
-                // Create an instruction sequence to perform the store requested by the guest.
-                unsafe {
-                    create_guest_store_sequence(
-                        instruction,
-                        instruction_size,
-                        vcpu,
-                        registers_load,
-                        register_values,
-                    );
-                }
-
-                // Execute the instruction sequence.
-                unsafe {
-                    asm!("fence.i", "jalr x1, 0({})", in(reg) registers_load as u64, out("x1") _, );
-                }
-
-                // Return to the guest.
-                vcpu_ref.sepc += instruction_size as u64;
-                vcpu_ref.run();
+            // Fetch an instruction by the address in stval.
+            unsafe {
+                asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
             }
+
+            // Get an instruction size in bytes by processing the quadrant.
+            // If the lowest two bits are 0b11, the instruction is 4 bytes; otherwise, it is 2 bytes.
+            let instruction_size = 2 + (((instruction & 0b10) >> 1) & (instruction & 0b01)) * 2;
+
+            // Each Hart has its own buffer; its address is related to the Hart ID.
+            // Uses a 34-byte offset instead of the actual 33-byte buffer size to maintain alignment.
+            let buffer_offset = 34 * 4 * vcpu_ref.host_hart_id;
+            let registers_load =
+                (&raw const __registers_load as usize + buffer_offset) as *mut [u32; 27];
+            let register_values =
+                (&raw const __register_values as usize + buffer_offset) as *mut [u64; 3];
+
+            // Create an instruction sequence to perform the store requested by the guest.
+            unsafe {
+                create_guest_store_sequence(
+                    instruction,
+                    instruction_size,
+                    vcpu,
+                    registers_load,
+                    register_values,
+                );
+            }
+
+            // Execute the instruction sequence.
+            unsafe {
+                asm!("fence.i", "jalr x1, 0({})", in(reg) registers_load as u64, out("x1") _, );
+            }
+
+            // Return to the guest.
+            vcpu_ref.sepc += instruction_size as u64;
+            vcpu_ref.run();
         }
 
         let locked_page_table = current_guest.page_table.lock();
