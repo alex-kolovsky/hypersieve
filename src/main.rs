@@ -5,6 +5,7 @@ mod allocator;
 mod guest;
 mod guest_table;
 mod multihart;
+mod registers;
 mod trap;
 mod uart;
 mod vcpu;

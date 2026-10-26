@@ -1,4 +1,8 @@
-use crate::{SYSTEM_MMIO_WINDOWS, vcpu::Vcpu};
+use crate::{
+    SYSTEM_MMIO_WINDOWS,
+    registers::{self},
+    vcpu::Vcpu,
+};
 use core::{
     arch::{asm, naked_asm},
     cmp::Ordering,
@@ -131,37 +135,37 @@ pub extern "C" fn trap_handler() {
         vstimecmp_offset = const offset_of!(Vcpu, vstimecmp),
 
         // Guest GPRs
-        ra_offset = const offset_of!(Vcpu, ra),
-        sp_offset = const offset_of!(Vcpu, sp),
-        gp_offset = const offset_of!(Vcpu, gp),
-        tp_offset = const offset_of!(Vcpu, tp),
-        t0_offset = const offset_of!(Vcpu, t0),
-        t1_offset = const offset_of!(Vcpu, t1),
-        t2_offset = const offset_of!(Vcpu, t2),
-        s0_offset = const offset_of!(Vcpu, s0),
-        s1_offset = const offset_of!(Vcpu, s1),
-        a0_offset = const offset_of!(Vcpu, a0),
-        a1_offset = const offset_of!(Vcpu, a1),
-        a2_offset = const offset_of!(Vcpu, a2),
-        a3_offset = const offset_of!(Vcpu, a3),
-        a4_offset = const offset_of!(Vcpu, a4),
-        a5_offset = const offset_of!(Vcpu, a5),
-        a6_offset = const offset_of!(Vcpu, a6),
-        a7_offset = const offset_of!(Vcpu, a7),
-        s2_offset = const offset_of!(Vcpu, s2),
-        s3_offset = const offset_of!(Vcpu, s3),
-        s4_offset = const offset_of!(Vcpu, s4),
-        s5_offset = const offset_of!(Vcpu, s5),
-        s6_offset = const offset_of!(Vcpu, s6),
-        s7_offset = const offset_of!(Vcpu, s7),
-        s8_offset = const offset_of!(Vcpu, s8),
-        s9_offset = const offset_of!(Vcpu, s9),
-        s10_offset = const offset_of!(Vcpu, s10),
-        s11_offset = const offset_of!(Vcpu, s11),
-        t3_offset = const offset_of!(Vcpu, t3),
-        t4_offset = const offset_of!(Vcpu, t4),
-        t5_offset = const offset_of!(Vcpu, t5),
-        t6_offset = const offset_of!(Vcpu, t6),
+        ra_offset = const offset_of!(Vcpu, gprs) + registers::RA_OFFSET * 8,
+        sp_offset = const offset_of!(Vcpu, gprs) + registers::SP_OFFSET * 8,
+        gp_offset = const offset_of!(Vcpu, gprs) + registers::GP_OFFSET * 8,
+        tp_offset = const offset_of!(Vcpu, gprs) + registers::TP_OFFSET * 8,
+        t0_offset = const offset_of!(Vcpu, gprs) + registers::T0_OFFSET * 8,
+        t1_offset = const offset_of!(Vcpu, gprs) + registers::T1_OFFSET * 8,
+        t2_offset = const offset_of!(Vcpu, gprs) + registers::T2_OFFSET * 8,
+        s0_offset = const offset_of!(Vcpu, gprs) + registers::S0_OFFSET * 8,
+        s1_offset = const offset_of!(Vcpu, gprs) + registers::S1_OFFSET * 8,
+        a0_offset = const offset_of!(Vcpu, gprs) + registers::A0_OFFSET * 8,
+        a1_offset = const offset_of!(Vcpu, gprs) + registers::A1_OFFSET * 8,
+        a2_offset = const offset_of!(Vcpu, gprs) + registers::A2_OFFSET * 8,
+        a3_offset = const offset_of!(Vcpu, gprs) + registers::A3_OFFSET * 8,
+        a4_offset = const offset_of!(Vcpu, gprs) + registers::A4_OFFSET * 8,
+        a5_offset = const offset_of!(Vcpu, gprs) + registers::A5_OFFSET * 8,
+        a6_offset = const offset_of!(Vcpu, gprs) + registers::A6_OFFSET * 8,
+        a7_offset = const offset_of!(Vcpu, gprs) + registers::A7_OFFSET * 8,
+        s2_offset = const offset_of!(Vcpu, gprs) + registers::S2_OFFSET * 8,
+        s3_offset = const offset_of!(Vcpu, gprs) + registers::S3_OFFSET * 8,
+        s4_offset = const offset_of!(Vcpu, gprs) + registers::S4_OFFSET * 8,
+        s5_offset = const offset_of!(Vcpu, gprs) + registers::S5_OFFSET * 8,
+        s6_offset = const offset_of!(Vcpu, gprs) + registers::S6_OFFSET * 8,
+        s7_offset = const offset_of!(Vcpu, gprs) + registers::S7_OFFSET * 8,
+        s8_offset = const offset_of!(Vcpu, gprs) + registers::S8_OFFSET * 8,
+        s9_offset = const offset_of!(Vcpu, gprs) + registers::S9_OFFSET * 8,
+        s10_offset = const offset_of!(Vcpu, gprs) + registers::S10_OFFSET * 8,
+        s11_offset = const offset_of!(Vcpu, gprs) + registers::S11_OFFSET * 8,
+        t3_offset = const offset_of!(Vcpu, gprs) + registers::T3_OFFSET * 8,
+        t4_offset = const offset_of!(Vcpu, gprs) + registers::T4_OFFSET * 8,
+        t5_offset = const offset_of!(Vcpu, gprs) + registers::T5_OFFSET * 8,
+        t6_offset = const offset_of!(Vcpu, gprs) + registers::T6_OFFSET * 8,
 
         // Host GPRs
         host_sp_offset = const offset_of!(Vcpu, host_sp),
@@ -203,20 +207,20 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     } else if exception_code == 10 && interrupt_bit == 0 {
         // Ecall
         unsafe {
-            match vcpu_ref.a7 {
+            match vcpu_ref.gprs[registers::A7_OFFSET] {
                 // Base extension
                 0x10 => {
-                    let a7 = vcpu_ref.a7;
-                    let a6 = vcpu_ref.a6;
-                    let mut a1 = vcpu_ref.a1;
-                    let mut a0 = vcpu_ref.a0;
+                    let a7 = vcpu_ref.gprs[registers::A7_OFFSET];
+                    let a6 = vcpu_ref.gprs[registers::A6_OFFSET];
+                    let mut a1 = vcpu_ref.gprs[registers::A1_OFFSET];
+                    let mut a0 = vcpu_ref.gprs[registers::A0_OFFSET];
                     asm!("ecall", inout("a0") a0, inout("a1") a1, in("a7") a7, in("a6") a6);
-                    vcpu_ref.a1 = a1;
-                    vcpu_ref.a0 = a0;
+                    vcpu_ref.gprs[registers::A1_OFFSET] = a1;
+                    vcpu_ref.gprs[registers::A0_OFFSET] = a0;
                 }
                 // Legacy putchar extension
                 0x01 => {
-                    let a0 = vcpu_ref.a0;
+                    let a0 = vcpu_ref.gprs[registers::A0_OFFSET];
 
                     asm!("ecall", in("a7") 0x01, in("a0") a0);
                 }

@@ -99,7 +99,7 @@ extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"add t0, t0, t1\",
         \"vs1r.v v31, (t0)\",
         \"ret\",
-        v0_offset = const offset_of!(crate::vcpu::Vcpu, v0),
+        v0_offset = const offset_of!(crate::vcpu::Vcpu, vector_registers),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
         vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
@@ -181,7 +181,7 @@ extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"add t0, t0, t1\",
         \"vl1r.v v31, (t0)\",
         \"ret\",
-        v0_offset = const offset_of!(crate::vcpu::Vcpu, v0),
+        v0_offset = const offset_of!(crate::vcpu::Vcpu, vector_registers),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
         vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
