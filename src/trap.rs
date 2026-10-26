@@ -10,12 +10,6 @@ use core::{
 };
 const SXLEN: u8 = 64;
 
-unsafe extern "C" {
-    pub static __trampoline: [u8; 8];
-    pub static __registers_load: [u64; 3];
-    pub static __register_values: [u64; 3];
-}
-
 #[macro_export]
 macro_rules! read_csr {
     ($csr_name:expr) => {{
@@ -255,7 +249,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
             .is_ok();
 
         if is_mmio {
-            process_mmio(current_guest, requested_guest_addr, vcpu);
+            process_mmio(vcpu_ref, requested_guest_addr, current_guest);
         } else {
             // Allocate a 4KiB-sized page for the guest.
             let locked_page_table = current_guest.page_table.lock();
@@ -336,166 +330,8 @@ fn scause_to_str<'a>(exception_code: &'a u64, interrupt_bit: &'a u64) -> &'a str
     }
 }
 
-/// # Safety
-/// This function is unsafe because it writes to RWX memory,
-/// which could potentially allow arbitrary code execution.
 #[inline(always)]
-unsafe fn create_guest_store_sequence(
-    instruction: u32,
-    instruction_size: u32,
-    vcpu: *const Vcpu,
-    registers_load: *mut [u32; 27],
-    register_values: *mut [u64; 3],
-) {
-    let is_instruction_compressed = (4 - instruction_size) >> 1;
-
-    // If the instruction is compressed, a NOP instruction is added
-    // to its upper bytes to prevent it from being executed.
-    let instruction = (instruction
-        & (0x0000FFFFu32 | (0xFFFF0000u32 * (is_instruction_compressed ^ 1))))
-        | ((0x0001u32 << 16u32) * is_instruction_compressed);
-
-    // Extract the op (inst[1:0]) and funct3 (inst[15:13]) fields
-    // from the compressed instruction code.
-    let op = instruction & 0b11;
-    let funct3 = (instruction >> 13) & 0x7;
-
-    let is_inst_operands_size_5 =
-                    // If op is 0b01 and funct3 is either 000, or 001, or 010, or 011.
-                    (((((op ^ 0b11) & 2) >> 1) & (op & 1))
-                    & ((funct3 >> 2) ^ 1))
-
-                    // If op is 0b10, the register operand fields are 5 bits wide.
-                    | (((op ^ 0b11) & 1) & (op >> 1))
-
-                    // If op is 0b11, the instruction is not compressed
-                    // and the register operand fields are 5 bits wide.
-                    | ((op >> 1) & (op & 1));
-    // Otherwise, register operand is 3 bits wide.
-
-    let inst_operands_size = is_inst_operands_size_5 * 2 + 3;
-    let operand_mask = (1 << inst_operands_size) - 1;
-
-    // For 4-byte instructions, register offsets are rd=7, rs1=15, rs2=20.
-    // For 2-byte instructions, offsets are rd/rs1=7, rs2=2.
-    let rd_offset = 7;
-    let rs1_offset = 7 + (is_instruction_compressed ^ 1) * 8;
-    let rs2_offset = 2 + (is_instruction_compressed ^ 1) * 18;
-
-    // Extract guest rd, rs1, rs2 operands from the instruction.
-    let compressed_operand_offset =
-        ((!inst_operands_size & 4) << 1) * ((instruction_size >> 2) ^ 1);
-    let rd = ((instruction >> rd_offset) & operand_mask) + compressed_operand_offset;
-    let rs1 = ((instruction >> rs1_offset) & operand_mask) + compressed_operand_offset;
-    let rs2 = ((instruction >> rs2_offset) & operand_mask) + compressed_operand_offset;
-
-    let return_address = 1;
-
-    let gprs = vcpu as *const [u64; 32];
-
-    // Write guest operands in memory to access them.
-    unsafe {
-        core::ptr::write_volatile(
-            register_values,
-            [
-                (*gprs)[rd as usize],
-                (*gprs)[rs1 as usize],
-                (*gprs)[rs2 as usize],
-            ],
-        );
-    }
-
-    // Calculate a free register to store the values of guest operands in it.
-    let guest_regs =
-        (!(3u32 | (1u32 << rd) | (1u32 << rs1) | (1u32 << rs2) | (1u32 << 2))).trailing_zeros();
-
-    // Calculate the PC-relative address for guest operands.
-    let pc_relative_values_addr = (register_values as u64)
-        - ((registers_load as u64)
-
-        // Add the size of the instructions that precede the auipc instruction.
-        + 40u64);
-
-    // Safely perform the guest store instruction.
-    let buffer: [u32; 27] = [
-        // Save the hypervisor registers in use
-
-        // sd instruction_rd, 0(sp)
-        (0x00013023 & !(0x1F << 20) | (rd << 20)),
-        // addi sp, sp, -8 (stack allocation)
-        0xff810113,
-        // sd instruction_rs1, 0(sp)
-        (0x00013023 & !(0x1F << 20) | (rs1 << 20)),
-        // addi sp, sp, -8 (stack allocation)
-        0xff810113,
-        // sd instruction_rs2, 0(sp)
-        (0x00013023 & !(0x1F << 20) | (rs2 << 20)),
-        // addi sp, sp, -8 (stack allocation)
-        0xff810113,
-        // sd ra, 0(sp)
-        (0x00013023 & !(0x1F << 20) | (return_address << 20)),
-        // addi sp, sp, -8 (stack allocation)
-        0xff810113,
-        // sd guest_regs_ptr, 0(sp)
-        (0x00013023 & !(0x1F << 20) | (guest_regs << 20)),
-        // csrw sp, sscratch
-        0x14011073,
-        // Calculate the PC-relative address for guest operands.
-
-        // auipc guest_regs,
-        (0x00000017 & !(0x1F << 7)) | (guest_regs << 7),
-        // addi guest_regs, guest_regs, ( pc relative guest_regs addr )
-        (0x01a00013 & !(0xFFF << 20 | 0x1F << 15 | 0x1F << 7)
-            | ((pc_relative_values_addr as u32) << 20 | guest_regs << 7 | guest_regs << 15)),
-        // Load the guest context into the operand registers.
-
-        // ld instruction_rd, 0(guest_regs)
-        (0x00003003 & !((0x1F << 15) | (0x1F << 7)) | (guest_regs << 15 | rd << 7)),
-        // ld instruction_rs1, 8(guest_regs)
-        (0x00803003 & !((0x1F << 15) | (0x1F << 7)) | (guest_regs << 15 | rs1 << 7)),
-        // ld instruction_rs2, 16(guest_regs)
-        (0x01003003 & !((0x1F << 15) | (0x1F << 7)) | (guest_regs << 15 | rs2 << 7)),
-        // Perform requested store instruction.
-
-        // requested instruction
-        instruction,
-        // Restore the hypervisor context.
-
-        // csrr sp, sscratch
-        0x14002173,
-        // ld guest_regs, 0(sp)
-        (0x00013003 & !(0x1F << 7) | (guest_regs << 7)),
-        // addi sp, sp, 8 (deallocate stack)
-        0x00810113,
-        // ld ra, 0(sp)
-        (0x00013003 & !(0x1F << 7) | (return_address << 7)),
-        // addi sp, sp, 8 (deallocate stack)
-        0x00810113,
-        // ld instruction_rs2, 0(sp)
-        (0x00013003 & !(0x1F << 7) | (rs2 << 7)),
-        // addi sp, sp, 8 (deallocate stack)
-        0x00810113,
-        // ld instrcuction_rs1, 0(sp)
-        (0x00013003 & !(0x1F << 7) | (rs1 << 7)),
-        // addi sp, sp, 8 (deallocate stack)
-        0x00810113,
-        // ld instructiond_rd, 0(sp)
-        (0x00013003 & !(0x1F << 7) | (rd << 7)),
-        // Return to the hypervisor.
-
-        // jalr x0, 0(x1)
-        0x000f0067 & !(0x1F << 15) | (return_address << 15),
-    ];
-
-    // Write the instruction sequence into the executable memory buffer.
-    unsafe {
-        core::ptr::write_volatile(registers_load, buffer);
-    }
-}
-
-#[inline(always)]
-fn process_mmio(current_guest: &crate::Guest, requested_guest_addr: u64, vcpu: *mut Vcpu) {
-    let vcpu_ref = unsafe { &mut *vcpu };
+fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &crate::Guest) {
     // If this is an allowed MMIO address, perform a write to it; otherwise, throw an exception to the guest.
     let search_result = current_guest
         .passthrough_mmio_regions
@@ -509,56 +345,181 @@ fn process_mmio(current_guest: &crate::Guest, requested_guest_addr: u64, vcpu: *
             }
         });
 
-    if search_result.is_ok() {
-        let executed_instruction_address: u64 = vcpu_ref.sepc;
-        let mut instruction: u32;
+    if let Ok(passthrough_mmio_id) = search_result {
+        // Htinst CSR contains the transformed instruction that caused the fault.
+        let htinst = read_csr!("htinst");
+        let opcode = htinst & 0x7F;
 
-        // Fetch an instruction by the address in stval.
-        unsafe {
-            asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+        // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
+        // Otherwise, instruction is scalar.
+        if htinst == 0x0 {
+            // Fetch the instruction from the address we got from the 'sepc' CSR.
+            let executed_instruction_address = vcpu_ref.sepc;
+            let mut instruction: u64;
+            unsafe {
+                asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+            }
+
+            vector_write(
+                vcpu_ref,
+                instruction,
+                current_guest,
+                passthrough_mmio_id,
+                requested_guest_addr,
+            );
+        } else {
+            scalar_write(
+                vcpu_ref,
+                htinst,
+                current_guest,
+                requested_guest_addr,
+                passthrough_mmio_id,
+            );
         }
 
         // Get an instruction size in bytes by processing the quadrant.
         // If the lowest two bits are 0b11, the instruction is 4 bytes; otherwise, it is 2 bytes.
-        let instruction_size = 2 + (((instruction & 0b10) >> 1) & (instruction & 0b01)) * 2;
-
-        // Each Hart has its own buffer; its address is related to the Hart ID.
-        // Uses a 34-byte offset instead of the actual 33-byte buffer size to maintain alignment.
-        let buffer_offset = 34 * 4 * vcpu_ref.host_hart_id;
-        let registers_load =
-            (&raw const __registers_load as usize + buffer_offset) as *mut [u32; 27];
-        let register_values =
-            (&raw const __register_values as usize + buffer_offset) as *mut [u64; 3];
-
-        // Create an instruction sequence to perform the store requested by the guest.
-        unsafe {
-            create_guest_store_sequence(
-                instruction,
-                instruction_size,
-                vcpu,
-                registers_load,
-                register_values,
-            );
-        }
-
-        // Execute the instruction sequence.
-        unsafe {
-            asm!("fence.i", "jalr x1, 0({})", in(reg) registers_load as u64, out("x1") _, );
-        }
+        let instruction_size = 2 + 2 * (((htinst & 0b11) == 0b11) as u32);
 
         // Increment the guest SEPC CSR to prevent an infinite loop.
         vcpu_ref.sepc += instruction_size as u64;
-
-        // Return to the guest.
         vcpu_ref.run();
     } else {
-        // Inject the Store/AMO Guest Page Fault
-        vcpu_ref.vsepc = vcpu_ref.sepc;
-        vcpu_ref.vscause = 15;
-        vcpu_ref.vstval = requested_guest_addr;
-        vcpu_ref.sepc = vcpu_ref.vstvec & !0b11;
-
-        // Return to the guest.
-        vcpu_ref.run();
+        inject_store_page_fault(vcpu_ref, requested_guest_addr);
     }
+}
+
+#[inline(always)]
+fn scalar_write(
+    vcpu_ref: &mut Vcpu,
+    htinst: u64,
+    current_guest: &crate::Guest,
+    requested_guest_addr: u64,
+    passthrough_mmio_id: usize,
+) {
+    // Get the rs2 field, the register identifier of the stored value.
+    let rs2_id = ((htinst >> 20) & 0x1F) as usize;
+
+    // Get the value we need to store from the array of saved general purpose registers.
+    let value_to_store = vcpu_ref.gprs[rs2_id];
+
+    // Calculate the size from the value of the instruction's 'width' field.
+    let width_field = (htinst >> 12) & 0x7;
+
+    // Calculate the size in bytes of the value stored.
+    // 0b00 => 1 Byte  (8-bit)
+    // 0b01 => 2 Bytes (16-bit)
+    // 0b10 => 4 Bytes (32-bit)
+    // 0b11 => 8 Bytes (64-bit)
+    let size = 1 << width_field;
+
+    // If the size exceeds the allowed region, inject an exception into the guest.
+    if size > current_guest.passthrough_mmio_regions[passthrough_mmio_id][1] {
+        inject_store_page_fault(vcpu_ref, requested_guest_addr);
+    }
+
+    // Write the value to the requested address.
+    match size {
+        1 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u8, value_to_store as u8);
+        },
+        2 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u16, value_to_store as u16);
+        },
+        4 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u32, value_to_store as u32);
+        },
+        8 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u64, value_to_store);
+        },
+        _ => {
+            unreachable!();
+        }
+    }
+}
+#[inline(always)]
+fn vector_write(
+    vcpu_ref: &mut Vcpu,
+    inst: u64,
+    current_guest: &crate::Guest,
+    passthrough_mmio_id: usize,
+    requested_guest_addr: u64,
+) {
+    // Get the vs3 field, the register identifier of the stored value.
+    let vs3_id = ((inst >> 7) & 0x1F) as usize;
+
+    // Get the value to be stored from the array of saved vector registers.
+    let value_to_store = vcpu_ref.vector_registers[vs3_id];
+
+    // Calculate the size based on the instruction's 'width' field encoding.
+    let width_type = (inst >> 26) & 0x1;
+    let size = match width_type {
+        // Dynamic Mode; The size is in the 'vsew' field of 'vtype' CSR.
+        1 => {
+            // Calculate the size in bytes of the value stored.
+            // 0b00 => 1 Byte  (8-bit)
+            // 0b01 => 2 Bytes (16-bit)
+            // 0b10 => 4 Bytes (32-bit)
+            // 0b11 => 8 Bytes (64-bit)
+            let vtype_vsew = (vcpu_ref.vtype >> 3) & 0x7;
+            1 << vtype_vsew
+        }
+        // Static mode; The size is written in the 'width' field of the instruction.
+        _ => {
+            // Calculate the size in bytes of the value stored.
+            // 0b00 => 1 Byte  (8-bit)
+            // 0b01 => 2 Bytes (16-bit)
+            // 0b10 => 4 Bytes (32-bit)
+            // 0b11 => 8 Bytes (64-bit)
+            let width_field = (inst >> 12) & 0x3;
+            1 << width_field
+        }
+    };
+
+    // If the size exceeds the allowed region, inject an exception into the guest.
+    if size > current_guest.passthrough_mmio_regions[passthrough_mmio_id][1] {
+        inject_store_page_fault(vcpu_ref, requested_guest_addr);
+    }
+
+    // Write the value to the requested address.
+    match size {
+        1 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u8, value_to_store[0] as u8);
+        },
+        2 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u16, value_to_store[0] as u16);
+        },
+        4 => unsafe {
+            core::ptr::write_volatile(requested_guest_addr as *mut u32, value_to_store[0]);
+        },
+        8 => unsafe {
+            core::ptr::write_volatile(
+                requested_guest_addr as *mut u64,
+                // Combine two 32-bit elements of the vector register array to get a 64-bit value.
+                ((value_to_store[0] as u64) << 32) | (value_to_store[0] as u64),
+            );
+        },
+        _ => {
+            unreachable!()
+        }
+    }
+}
+
+fn inject_store_page_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64) -> ! {
+    // Inject the Store/AMO Guest Page Fault
+
+    // Set the failed instruction address to the guest's sepc (vsepc) CSR.
+    vcpu_ref.vsepc = vcpu_ref.sepc;
+
+    // Set the vscause CSR (guest's scause) to a 'Store/AMO page fault'.
+    vcpu_ref.vscause = 15;
+
+    // Set the failed address to guest's stval (vstval) CSR.
+    vcpu_ref.vstval = requested_guest_addr;
+
+    // Set the guest's PC to the guest's trap handler address (mask out the lower 2 bits which encode the 'Mode').
+    vcpu_ref.sepc = vcpu_ref.vstvec & !0b11;
+
+    // Return to the guest.
+    vcpu_ref.run();
 }
