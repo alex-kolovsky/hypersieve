@@ -130,10 +130,10 @@ fn handle_scalar_instruction(
     // 0b11 => 8 Bytes (64-bit)
     let size = 1 << width_field;
 
-    // If the size exceeds the allowed region, inject an exception into the guest.
-    if size > current_guest.passthrough_mmio_regions[passthrough_mmio_id][1] {
-        inject_store_page_fault(vcpu_ref, requested_guest_addr);
-    }
+    // Inject a guest exception if the requested access overflows the MMIO region boundaries.
+    let max_size = (current_guest.passthrough_mmio_regions[passthrough_mmio_id][0]
+        + current_guest.passthrough_mmio_regions[passthrough_mmio_id][1])
+        - requested_guest_addr;
 
     // Match the 7-bit opcode to determine the register file type (GPR vs. FPR)
     // and the memory access direction (Load vs. Store) of the trapped instruction.
@@ -141,28 +141,40 @@ fn handle_scalar_instruction(
     let is_load = (opcode & 0x20) == 0;
 
     match is_load {
-        true => match opcode {
-            // Scalar floating point load
-            0x07 | 0x05 => {
-                vcpu_ref.fprs[rs2_id] = f64::from_bits(scalar_load(size, requested_guest_addr));
+        true => {
+            if size > max_size {
+                inject_load_page_fault(vcpu_ref, requested_guest_addr);
             }
-            // Scalar integer load
-            _ => {
-                vcpu_ref.gprs[rs2_id] = scalar_load(size, requested_guest_addr);
+
+            match opcode {
+                // Scalar floating point load
+                0x07 | 0x05 => {
+                    vcpu_ref.fprs[rs2_id] = f64::from_bits(scalar_load(size, requested_guest_addr));
+                }
+                // Scalar integer load
+                _ => {
+                    vcpu_ref.gprs[rs2_id] = scalar_load(size, requested_guest_addr);
+                }
             }
-        },
-        false => match opcode {
-            // Scalar floating point store
-            0x27 | 0x25 => {
-                let value_to_store = vcpu_ref.fprs[rs2_id].to_bits();
-                scalar_write(size, requested_guest_addr, value_to_store);
+        }
+        false => {
+            if size > max_size {
+                inject_store_page_fault(vcpu_ref, requested_guest_addr);
             }
-            // Scalar integer store
-            _ => {
-                let value_to_store = vcpu_ref.gprs[rs2_id];
-                scalar_write(size, requested_guest_addr, value_to_store);
+
+            match opcode {
+                // Scalar floating point store
+                0x27 | 0x25 => {
+                    let value_to_store = vcpu_ref.fprs[rs2_id].to_bits();
+                    scalar_write(size, requested_guest_addr, value_to_store);
+                }
+                // Scalar integer store
+                _ => {
+                    let value_to_store = vcpu_ref.gprs[rs2_id];
+                    scalar_write(size, requested_guest_addr, value_to_store);
+                }
             }
-        },
+        }
     };
 }
 
@@ -238,16 +250,20 @@ fn handle_vector_instruction(
         }
     };
 
-    // If the size exceeds the allowed region, inject an exception into the guest.
-    if size > current_guest.passthrough_mmio_regions[passthrough_mmio_id][1] {
-        inject_store_page_fault(vcpu_ref, requested_guest_addr);
-    }
+    // Inject a guest exception if the requested access overflows the MMIO region boundaries.
+    let max_size = (current_guest.passthrough_mmio_regions[passthrough_mmio_id][0]
+        + current_guest.passthrough_mmio_regions[passthrough_mmio_id][1])
+        - requested_guest_addr;
 
     let opcode = inst & 0x7F;
 
     match opcode {
         // Vector store
         0x27 => {
+            if size > max_size {
+                inject_store_page_fault(vcpu_ref, requested_guest_addr);
+            }
+
             // Get the value to be stored from the array of saved vector registers.
             let value_to_store = vcpu_ref.vrs[vs3_id];
             vector_write(size, requested_guest_addr, value_to_store);
@@ -255,6 +271,10 @@ fn handle_vector_instruction(
 
         // Vector load
         0x07 => {
+            if size > max_size {
+                inject_load_page_fault(vcpu_ref, requested_guest_addr);
+            }
+
             vcpu_ref.vrs[vs3_id] = vector_load(size, requested_guest_addr);
         }
         _ => panic!("Unsupported instruction opcode: {opcode:#x}"),
