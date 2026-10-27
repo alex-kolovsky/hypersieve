@@ -1,0 +1,4 @@
+[mappings]
+"ns16550a"     = "crate::mmio::uart::handle_access"
+"riscv,plic0"  = "crate::mmio::plic::handle_access"
+"riscv,clint0" = "crate::mmio::clint::handle_access"

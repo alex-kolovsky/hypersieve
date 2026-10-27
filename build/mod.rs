@@ -1,3 +1,4 @@
+pub mod drivers;
 pub mod floating_point_extension_support;
 pub mod guest_constants;
 pub mod hardware_dts_parser;
