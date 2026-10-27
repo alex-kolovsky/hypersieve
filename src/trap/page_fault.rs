@@ -66,6 +66,7 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
     if let Ok(passthrough_mmio_id) = search_result {
         // Htinst CSR contains the transformed instruction that caused the fault.
         let htinst = read_csr!("htinst");
+        let opcode = htinst & 0x7F;
 
         // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
         // Otherwise, instruction is scalar.
@@ -84,6 +85,8 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
                 passthrough_mmio_id,
                 requested_guest_addr,
             );
+        } else if opcode == 0x2F {
+            handle_amo(htinst, requested_guest_addr, vcpu_ref);
         } else {
             handle_scalar_instruction(
                 vcpu_ref,
@@ -135,29 +138,31 @@ fn handle_scalar_instruction(
     // Match the 7-bit opcode to determine the register file type (GPR vs. FPR)
     // and the memory access direction (Load vs. Store) of the trapped instruction.
     let opcode = htinst & 0x7F;
-    match opcode {
-        // Standard or compressed scalar integer store
-        0x23 | 0x21 => {
-            let value_to_store = vcpu_ref.gprs[rs2_id];
-            scalar_write(size, requested_guest_addr, value_to_store);
-        }
+    let is_load = (opcode & 0x20) == 0;
 
-        // Standard or compressed scalar floating point store
-        0x27 | 0x25 => {
-            let value_to_store = vcpu_ref.fprs[rs2_id].to_bits();
-            scalar_write(size, requested_guest_addr, value_to_store);
-        }
-
-        // Standard or compressed scalar integer load
-        0x03 | 0x01 => {
-            vcpu_ref.gprs[rs2_id] = scalar_load(size, requested_guest_addr);
-        }
-
-        // Standard or compressed scalar floating point load
-        0x07 | 0x05 => {
-            vcpu_ref.fprs[rs2_id] = f64::from_bits(scalar_load(size, requested_guest_addr));
-        }
-        _ => panic!("Unsupported instruction opcode: {opcode:#x}"),
+    match is_load {
+        true => match opcode {
+            // Scalar floating point load
+            0x07 | 0x05 => {
+                vcpu_ref.fprs[rs2_id] = f64::from_bits(scalar_load(size, requested_guest_addr));
+            }
+            // Scalar integer load
+            _ => {
+                vcpu_ref.gprs[rs2_id] = scalar_load(size, requested_guest_addr);
+            }
+        },
+        false => match opcode {
+            // Scalar floating point store
+            0x27 | 0x25 => {
+                let value_to_store = vcpu_ref.fprs[rs2_id].to_bits();
+                scalar_write(size, requested_guest_addr, value_to_store);
+            }
+            // Scalar integer store
+            _ => {
+                let value_to_store = vcpu_ref.gprs[rs2_id];
+                scalar_write(size, requested_guest_addr, value_to_store);
+            }
+        },
     };
 }
 
@@ -310,6 +315,47 @@ fn vector_load(size: u64, requested_guest_addr: u64) -> Vr {
         }
     }
     vr
+}
+
+#[inline(always)]
+fn handle_amo(htinst: u64, requested_guest_addr: u64, vcpu_ref: &mut Vcpu) {
+    // Note that this emulation is not strictly atomic, atomicity is
+    // unnecessary when dealing with single-threaded MMIO peripherals.
+
+    // The 'funct5' field represents which operation the requested AMO instruction performs.
+    let funct5 = (htinst >> 27) & 0x1F;
+
+    // The 'rs2' field contains the guest operand.
+    let rs2 = (htinst >> 20) & 0x1F;
+    let guest_operand = vcpu_ref.gprs[rs2 as usize];
+
+    // The 'rd' field specifies the destination register where the old memory state value is loaded.
+    let rd = (htinst >> 7) & 0x1F;
+
+    // Read the initial memory value.
+    let mem_val = unsafe { core::ptr::read_volatile(requested_guest_addr as *mut u64) };
+
+    // Perform the requested operation on the guest operand and memory value to compute the new state.
+    let new_mem_val = match funct5 {
+        0x01 => guest_operand,                                     // amoswap
+        0x00 => mem_val.wrapping_add(guest_operand),               // amoadd
+        0x04 => mem_val ^ guest_operand,                           // amoxor
+        0x0C => mem_val & guest_operand,                           // amoand
+        0x08 => mem_val | guest_operand,                           // amoor
+        0x10 => (mem_val as i64).min(guest_operand as i64) as u64, // amomin
+        0x14 => (mem_val as i64).max(guest_operand as i64) as u64, // amomax
+        0x18 => mem_val.min(guest_operand),                        // amominu
+        0x1C => mem_val.max(guest_operand),                        // amomaxu
+        _ => panic!("Unsupported AMO type: {:#x}", funct5),
+    };
+
+    // Write this new value to the memory.
+    unsafe {
+        core::ptr::write_volatile(requested_guest_addr as *mut u64, new_mem_val);
+    }
+
+    // Load the old memory state into the destination register.
+    vcpu_ref.gprs[rd as usize] = mem_val;
 }
 
 fn inject_store_page_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64) -> ! {
