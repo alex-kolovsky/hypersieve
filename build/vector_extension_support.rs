@@ -23,7 +23,7 @@ fn add_vector_extension_support(vector_extension_support_file: &mut std::fs::Fil
 pub const VLEN: usize = {vlen};
 
 #[unsafe(naked)]
-extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
+extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
         // Store vector CSRs.
         \"csrr t0, vl\",
@@ -33,7 +33,7 @@ extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
 
         // Store general vector registers.
         \"csrr t1, vlenb\",
-        \"li t0, {{v0_offset}}\",
+        \"li t0, {{vrs_offset}}\",
         \"add t0, t0, a0\",
         \"vs1r.v v0, (t0)\",
         \"add t0, t0, t1\",
@@ -99,14 +99,14 @@ extern \"C\" fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"add t0, t0, t1\",
         \"vs1r.v v31, (t0)\",
         \"ret\",
-        v0_offset = const offset_of!(crate::vcpu::Vcpu, vector_registers),
+        vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
         vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
 }}
 
 #[unsafe(naked)]
-extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
+extern \"C\" fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
         // Load vector CSRs.
         \"ld t0, {{vl_offset}}(a0)\",
@@ -115,7 +115,7 @@ extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
 
         // Load general vector registers.
         \"csrr t1, vlenb\",
-        \"li t0, {{v0_offset}}\",
+        \"li t0, {{vrs_offset}}\",
         \"add t0, t0, a0\",
         \"vl1r.v v0, (t0)\",
         \"add t0, t0, t1\",
@@ -181,7 +181,7 @@ extern \"C\" fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{
         \"add t0, t0, t1\",
         \"vl1r.v v31, (t0)\",
         \"ret\",
-        v0_offset = const offset_of!(crate::vcpu::Vcpu, vector_registers),
+        vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
         vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
     );
@@ -199,10 +199,10 @@ fn write_empty_vector_extension_support_file(vector_extension_support_file: &mut
 pub const VLEN: usize = 0;
 
 #[allow(unused_variables)]
-pub const fn save_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{}}
+pub const fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{}}
 
 #[allow(unused_variables)]
-pub const fn restore_vector_registers(vcpu: *mut crate::vcpu::Vcpu) {{}}
+pub const fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{}}
 "
     )
     .unwrap();

@@ -34,14 +34,14 @@ pub struct Vcpu {
     pub vstimecmp: u64,
 
     // Vector registers
-    pub vector_registers: [[u32; VLEN / 32]; 32],
+    pub vrs: [[u32; VLEN / 32]; 32],
 
     // Vector CSRs
     pub vtype: u64,
     pub vl: u64,
 
     // Floating-point registers
-    pub float_registers: [f64; 32],
+    pub fprs: [f64; 32],
 }
 
 impl Vcpu {
@@ -76,10 +76,10 @@ impl Vcpu {
             vl: 0,
 
             // Vector registers
-            vector_registers: [[0; VLEN / 32]; 32],
+            vrs: [[0; VLEN / 32]; 32],
 
             // Floating-point registers
-            float_registers: [0.0; 32],
+            fprs: [0.0; 32],
         }
     }
     pub fn new(guest_entry: u64, virtual_hart_id: u64) -> Self {
@@ -371,11 +371,11 @@ fn restore_extension_registers(vcpu_ptr: *mut Vcpu) {
     let vcpu_ref = unsafe { &(*vcpu_ptr) };
     if (vcpu_ref.vsstatus & ((1 << 9) | (1 << 10))) != 0 {
         // Restore vector registers.
-        crate::restore_vector_registers(vcpu_ptr);
+        crate::restore_vrs(vcpu_ptr);
     }
 
     if (vcpu_ref.vsstatus & ((1 << 14) | (1 << 13))) != 0 {
         // Restore floating-point registers.
-        crate::restore_floating_point_registers(vcpu_ptr);
+        crate::restore_fprs(vcpu_ptr);
     }
 }

@@ -173,7 +173,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     let vsstatus_vs = (vsstatus & (1 << 9 | 1 << 10)) >> 9;
 
     if vsstatus_vs == 3 {
-        crate::save_vector_registers(vcpu);
+        crate::save_vrs(vcpu);
 
         vcpu_ref.vsstatus &= !(1 << 9 | 1 << 10);
         vcpu_ref.vsstatus |= 2 << 9;
@@ -183,7 +183,7 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     let vsstatus_fs = (vsstatus & (1 << 13 | 1 << 14)) >> 13;
 
     if vsstatus_fs == 3 {
-        crate::save_floating_point_registers(vcpu);
+        crate::save_fprs(vcpu);
 
         vcpu_ref.vsstatus &= !(1 << 13 | 1 << 14);
         vcpu_ref.vsstatus |= 2 << 13;
@@ -348,14 +348,13 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
     if let Ok(passthrough_mmio_id) = search_result {
         // Htinst CSR contains the transformed instruction that caused the fault.
         let htinst = read_csr!("htinst");
-        let opcode = htinst & 0x7F;
 
         // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
         // Otherwise, instruction is scalar.
         if htinst == 0x0 {
             // Fetch the instruction from the address we got from the 'sepc' CSR.
             let executed_instruction_address = vcpu_ref.sepc;
-            let mut instruction: u64;
+            let mut instruction: u32;
             unsafe {
                 asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
             }
@@ -400,8 +399,23 @@ fn scalar_write(
     // Get the rs2 field, the register identifier of the stored value.
     let rs2_id = ((htinst >> 20) & 0x1F) as usize;
 
-    // Get the value we need to store from the array of saved general purpose registers.
-    let value_to_store = vcpu_ref.gprs[rs2_id];
+    // Match the 7-bit opcode to determine whether the trapped
+    // instruction targets a General-Purpose (GPR) or Floating-Point (FPR) register.
+    let opcode = htinst & 0x7F;
+    let value_to_store = match opcode {
+        // Get the value we need to store from the array of saved registers.
+        0x23 | 0x21 => vcpu_ref.gprs[rs2_id],
+        0x27 => vcpu_ref.fprs[rs2_id].to_bits(),
+        _ => {
+            // Fetch the instruction from the address we got from the 'sepc' CSR.
+            let executed_instruction_address = vcpu_ref.sepc;
+            let mut instruction: u32;
+            unsafe {
+                asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+            }
+            panic!("{instruction:#x}");
+        }
+    };
 
     // Calculate the size from the value of the instruction's 'width' field.
     let width_field = (htinst >> 12) & 0x7;
@@ -440,7 +454,7 @@ fn scalar_write(
 #[inline(always)]
 fn vector_write(
     vcpu_ref: &mut Vcpu,
-    inst: u64,
+    inst: u32,
     current_guest: &crate::Guest,
     passthrough_mmio_id: usize,
     requested_guest_addr: u64,
@@ -449,7 +463,7 @@ fn vector_write(
     let vs3_id = ((inst >> 7) & 0x1F) as usize;
 
     // Get the value to be stored from the array of saved vector registers.
-    let value_to_store = vcpu_ref.vector_registers[vs3_id];
+    let value_to_store = vcpu_ref.vrs[vs3_id];
 
     // Calculate the size based on the instruction's 'width' field encoding.
     let width_type = (inst >> 26) & 0x1;
