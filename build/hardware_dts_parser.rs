@@ -14,7 +14,6 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
     // The even-indexed array elements are the MMIO start addresses,
     // and the odd-indexed ones are the end sizes.
     let mut passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
-    let mut aligned_passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
     let mut emulate_memory_peripherals: HashMap<Vec<String>, Vec<[u64; 2]>> = HashMap::new();
 
     if let Some(soc) = fdt.find_node("/soc") {

@@ -1,7 +1,8 @@
-pub const TIMER_OFFSET: u64 = 10_000;
-
 use crate::{GUESTS, VLEN, read_csr, registers};
 use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
+
+pub const TIMER_OFFSET: u64 = 10_000;
+pub type Vr = [u32; VLEN / 32];
 
 #[repr(C)]
 #[repr(align(8))]
@@ -34,7 +35,7 @@ pub struct Vcpu {
     pub vstimecmp: u64,
 
     // Vector registers
-    pub vrs: [[u32; VLEN / 32]; 32],
+    pub vrs: [Vr; 32],
 
     // Vector CSRs
     pub vtype: u64,
