@@ -1,5 +1,3 @@
-use core::cmp::Ordering;
-
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum MmioPolicy {
     Emulate,
@@ -13,27 +11,7 @@ pub struct MemoryRegion {
 
 impl MemoryRegion {
     pub fn end_addr(&self) -> u64 {
-        self.base_addr + self.size
-    }
-
-    pub fn contains(&self, memory_region: &MemoryRegion) -> Ordering {
-        // If the region overlaps with a parent region, return "Equal".
-        if (memory_region.base_addr >= self.base_addr && memory_region.base_addr <= self.end_addr())
-            || (memory_region.end_addr() >= self.base_addr
-                && memory_region.end_addr() <= self.end_addr())
-        {
-            Ordering::Equal
-        }
-        // If the region's base address sits above the parent region, return "Greater".
-        else if memory_region.base_addr > self.end_addr() {
-            Ordering::Greater
-        }
-        // If the region's base address sits under the parent region, return "Less".
-        else if memory_region.end_addr() < self.base_addr {
-            Ordering::Less
-        } else {
-            unreachable!()
-        }
+        self.base_addr + self.size - 1
     }
 
     pub fn is_aligned(&self) -> bool {
@@ -49,7 +27,7 @@ impl MemoryRegion {
 }
 #[derive(Debug, Clone)]
 pub struct MmioPeripheral {
-    pub regions: Vec<MemoryRegion>,
+    pub region: MemoryRegion,
     pub policy: MmioPolicy,
     pub compatible: String,
 }
@@ -81,6 +59,14 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 .as_str()
                 .unwrap();
 
+            let policy = if memory_policy_str == "emulate" {
+                MmioPolicy::Emulate
+            } else if memory_policy_str == "passthrough" {
+                MmioPolicy::Passthrough
+            } else {
+                panic!("Unsupported memory policy");
+            };
+
             let compatible: String = peripheral
                 .property("compatible")
                 .expect("No compatible field in the hardware DTS")
@@ -89,7 +75,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 .to_string();
 
             // Extract addresses of peripheral (reg).
-            let mut regions: Vec<MemoryRegion> = Vec::new();
+            let mut regions: Vec<MmioPeripheral> = Vec::new();
 
             let reg = peripheral
                 .property("reg")
@@ -106,26 +92,19 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
             for bytes in chunks.chunks(2) {
                 let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
-                regions.push(MemoryRegion { base_addr, size })
+                let region = MemoryRegion { base_addr, size };
+                regions.push(MmioPeripheral {
+                    region,
+                    policy,
+                    compatible: compatible.clone(),
+                })
             }
 
-            regions.sort_by_key(|memory_region| memory_region.base_addr);
+            regions.sort_by_key(|memory_region| memory_region.region.base_addr);
 
-            let policy = if memory_policy_str == "emulate" {
-                MmioPolicy::Emulate
-            } else if memory_policy_str == "passthrough" {
-                MmioPolicy::Passthrough
-            } else {
-                panic!("Unsupported memory policy");
-            };
-
-            mmio_peripherals.push(MmioPeripheral {
-                regions,
-                policy,
-                compatible,
-            })
+            mmio_peripherals.extend(regions);
         }
     }
-    mmio_peripherals.sort_by_key(|mmio_peripheral| mmio_peripheral.regions[0].base_addr);
+    mmio_peripherals.sort_by_key(|mmio_peripheral| mmio_peripheral.region.base_addr);
     mmio_peripherals
 }

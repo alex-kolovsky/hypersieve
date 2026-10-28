@@ -57,16 +57,11 @@ impl MmioMemoryRegion {
             } else {
                 None
             };
-            for region in &peripheral.regions {
-                let base_addr = region.base_addr;
-                let size = region.size;
-
-                mmio_regions.push(Self {
-                    base_addr,
-                    size,
-                    emulation_fn: emulation_fn.clone(),
-                });
-            }
+            mmio_regions.push(Self {
+                base_addr: peripheral.region.base_addr,
+                size: peripheral.region.size,
+                emulation_fn: emulation_fn.clone(),
+            });
         }
         mmio_regions
     }
