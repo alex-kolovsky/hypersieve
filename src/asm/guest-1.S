@@ -15,13 +15,14 @@ first_hart:
     vsetvli t1, t0, e32, m1, ta, ma
 
     # Load the ASCII character 'V' into the v31 register.
-    li t0, 'V'
-    vmv.v.x v31, t0
+    li t0, 0x10000000
+    li t1, 'V'
+    vmv.v.x v31, t1
 
     first_hart_loop:
 
-    # Move the character from v31 to a0 and print it to the screen.
-    vmv.x.s a0, v31
+    # Print the 'V' letter from the v31 register via Uart.
+    vse8.v v31, (t0)
 
     # It tests the save-and-restore logic of the vector extension.
     ecall
@@ -33,6 +34,10 @@ second_hart:
     # Write the ASCII character 'U' into the UART.
     li a0, 'U'
     li a1, 0x10000000
+    amoswap.w zero, a0, (a1)
+    li a1, 0xFFFFFFFFDEFEC8ED
     sw a0, 0(a1)
+
+    # sw a0, 0(a1)
 
     j second_hart

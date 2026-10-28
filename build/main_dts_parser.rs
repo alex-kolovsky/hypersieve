@@ -94,6 +94,12 @@ pub fn parse_dts(
         for bytes in chunks.chunks(2) {
             let base_addr: u64 = u64::from_be_bytes(bytes[0]);
             let size: u64 = u64::from_be_bytes(bytes[1]);
+
+            // Panic if the memory address sum overflows.
+            base_addr.checked_add(size).unwrap_or_else(|| {
+                panic!("Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows")
+            });
+
             system_mmio_windows.push(MemoryRegion { base_addr, size });
         }
 
@@ -121,6 +127,14 @@ pub fn parse_dts(
             for bytes in chunks.chunks(2) {
                 let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
+
+                // Panic if the memory address sum overflows.
+                base_addr.checked_add(size).unwrap_or_else(|| {
+                    panic!(
+                        "Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
+                    )
+                });
+
                 allowed_mmio.push(MemoryRegion { base_addr, size });
             }
 
@@ -328,6 +342,7 @@ fn partition_passthrough_mmio_regions(
             MemoryRegion { base_addr, size }
         } else if allowed_region.base_addr > peripheral_region.end_addr() {
             // The allowed region is strictly higher than the peripheral region.
+            //
             //  [ peripheral region ]
             //
             //                             [  allowed region  ]
@@ -338,6 +353,7 @@ fn partition_passthrough_mmio_regions(
             continue;
         } else if allowed_region.end_addr() < peripheral_region.base_addr {
             // The allowed region is strictly lower than the peripheral region.
+            //
             //                             [ peripheral region ]
             //
             //  [  allowed region  ]
@@ -350,6 +366,8 @@ fn partition_passthrough_mmio_regions(
             unreachable!();
         };
 
+        // If the address is passthrough and page-aligned, stage it for GPT entry generation.
+        // Otherwise, route it to the fallback emulation vector.
         if !peripheral.is_emulate() && memory_region.is_aligned() {
             allowed_aligned_passthrough_mmio_addrs.push(memory_region);
         } else {
@@ -359,6 +377,9 @@ fn partition_passthrough_mmio_regions(
                 compatible: peripheral.compatible.clone(),
             });
         }
+
+        // If part of the allowed region exceeds the peripheral region, move to the next peripheral.
+        // Otherwise, move to the next allowed region.
         if allowed_region.end_addr() > peripheral_region.end_addr() {
             p += 1;
         } else {

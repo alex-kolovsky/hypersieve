@@ -92,6 +92,14 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
             for bytes in chunks.chunks(2) {
                 let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
+
+                // Panic if the memory address sum overflows.
+                base_addr.checked_add(size).unwrap_or_else(|| {
+                    panic!(
+                        "Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
+                    )
+                });
+
                 let region = MemoryRegion { base_addr, size };
                 regions.push(MmioPeripheral {
                     region,
