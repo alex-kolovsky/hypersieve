@@ -1,5 +1,7 @@
 use crate::Guest;
 use crate::Hart;
+use crate::build_modules::hardware_dts_parser::MemoryRegion;
+use crate::build_modules::hardware_dts_parser::MmioPeripheral;
 
 #[derive(Debug)]
 pub struct HypervisorConfiguration {
@@ -10,12 +12,12 @@ pub struct HypervisorConfiguration {
 
     pub max_supported_harts_per_guest: usize,
     pub max_supported_assigned_harts_per_guest: usize,
-    pub max_passthrough_mmio_regions_count: usize,
+    pub max_allowed_mmio_peripherals_count: usize,
     pub max_aligned_passthrough_mmio_regions_count: usize,
 
     pub vlen: usize,
     pub floating_point_extension: bool,
-    pub system_mmio_windows: Vec<[u64; 2]>,
+    pub system_mmio_windows: Vec<MemoryRegion>,
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
@@ -44,7 +46,7 @@ pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) 
 
 pub fn parse_dts(
     out_dir: &str,
-    passthrough_memory_peripherals: Vec<[u64; 2]>,
+    mmio_peripherals: Vec<crate::build_modules::hardware_dts_parser::MmioPeripheral>,
 ) -> HypervisorConfiguration {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
 
@@ -60,7 +62,7 @@ pub fn parse_dts(
     let mut max_supported_harts_per_guest: usize = 0;
     let mut max_supported_assigned_harts_per_guest: usize = 0;
 
-    let mut max_passthrough_mmio_regions_count: usize = 0;
+    let mut max_allowed_mmio_peripherals_count: usize = 0;
     let mut max_aligned_passthrough_mmio_regions_count: usize = 0;
 
     // Total hart capacity allocated across all guest VMs.
@@ -69,7 +71,7 @@ pub fn parse_dts(
     let vlen: usize;
     let floating_point_extension: bool;
 
-    let mut system_mmio_windows: Vec<[u64; 2]> = Vec::new();
+    let mut system_mmio_windows: Vec<MemoryRegion> = Vec::new();
 
     let mut guests: Vec<Guest> = Vec::new();
     let fdt = fdt::Fdt::new(&dtb_data).unwrap();
@@ -92,12 +94,12 @@ pub fn parse_dts(
         for bytes in chunks.chunks(2) {
             let base_addr: u64 = u64::from_be_bytes(bytes[0]);
             let size: u64 = u64::from_be_bytes(bytes[1]);
-            system_mmio_windows.push([base_addr, size]);
+            system_mmio_windows.push(MemoryRegion { base_addr, size });
         }
 
         for guest in hypervisor.children() {
             // Extract the VM entry address.
-            let entry = guest
+            let entry_gpa = guest
                 .property("entry")
                 .expect("No entry field in DTS")
                 .as_usize()
@@ -113,13 +115,13 @@ pub fn parse_dts(
                 .property("allowed-mmio")
                 .expect("No allowed-mmio field in the hardware DTS");
 
-            let mut allowed_mmio = Vec::new();
+            let mut allowed_mmio: Vec<MemoryRegion> = Vec::new();
             let (chunks, _remainder) = allowed_mmio_raw.value.as_chunks::<8>();
 
             for bytes in chunks.chunks(2) {
-                let addr: u64 = u64::from_be_bytes(bytes[0]);
+                let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
-                allowed_mmio.push([addr, size]);
+                allowed_mmio.push(MemoryRegion { base_addr, size });
             }
 
             let path = guest
@@ -132,14 +134,11 @@ pub fn parse_dts(
                 panic!("Guest file {path} not found");
             }
 
-            let (aligned_passthrough_mmio_regions, passthrough_mmio_regions) =
-                get_allowed_passthrough_mmio_regions(
-                    &passthrough_memory_peripherals,
-                    &allowed_mmio,
-                );
+            let (aligned_passthrough_mmio_regions, allowed_mmio_peripherals) =
+                get_allowed_passthrough_mmio_regions(&mmio_peripherals, &allowed_mmio);
 
-            if passthrough_mmio_regions.len() > max_passthrough_mmio_regions_count {
-                max_passthrough_mmio_regions_count = passthrough_mmio_regions.len();
+            if allowed_mmio_peripherals.len() > max_allowed_mmio_peripherals_count {
+                max_allowed_mmio_peripherals_count = allowed_mmio_peripherals.len();
             }
 
             if aligned_passthrough_mmio_regions.len() > max_aligned_passthrough_mmio_regions_count {
@@ -184,25 +183,25 @@ pub fn parse_dts(
                     max_supported_assigned_harts_per_guest = harts.len();
                 }
 
-                let guest_entry = Guest::new(
-                    entry,
+                let guest_entry = Guest {
+                    entry_gpa,
                     hart_capacity,
-                    guest_assigned_harts,
-                    String::from(path),
+                    assigned_harts: guest_assigned_harts,
+                    path: String::from(path),
                     aligned_passthrough_mmio_regions,
-                    passthrough_mmio_regions,
-                );
+                    allowed_mmio_peripherals,
+                };
 
                 guests.push(guest_entry);
             } else {
-                let guest_entry = Guest::new(
-                    entry,
+                let guest_entry = Guest {
+                    entry_gpa,
                     hart_capacity,
-                    Vec::new(),
-                    String::from(path),
+                    assigned_harts: Vec::new(),
+                    path: String::from(path),
                     aligned_passthrough_mmio_regions,
-                    passthrough_mmio_regions,
-                );
+                    allowed_mmio_peripherals,
+                };
                 guests.push(guest_entry);
             }
         }
@@ -210,7 +209,7 @@ pub fn parse_dts(
         panic!("No hypervisor configuration in DTS");
     }
 
-    // Populate Hart structures for the harts vector.
+    // Populate Hart structures for the 'harts' vector.
     for hart_id in 0..total_hart_capacity {
         let entry: Hart = Hart {
             hart_id,
@@ -230,7 +229,7 @@ pub fn parse_dts(
         guests,
         max_supported_harts_per_guest,
         max_supported_assigned_harts_per_guest,
-        max_passthrough_mmio_regions_count,
+        max_allowed_mmio_peripherals_count,
         max_aligned_passthrough_mmio_regions_count,
         harts,
         total_hart_capacity,
@@ -241,40 +240,49 @@ pub fn parse_dts(
 }
 
 fn get_allowed_passthrough_mmio_regions(
-    // All MMIO regions in the system with "passthrough" policy.
-    passthrough_mmio_regions: &[[u64; 2]],
-    // All MMIO regions allowed to access in the system.
-    allowed_addrs: &[[u64; 2]],
-) -> (Vec<[u64; 2]>, Vec<[u64; 2]>) {
-    let mut allowed_passthrough_mmio_addrs: Vec<[u64; 2]> = Vec::new();
-    let mut allowed_aligned_passthrough_mmio_addrs: Vec<[u64; 2]> = Vec::new();
+    // All MMIO peripherals in the system.
+    mmio_peripherals: &Vec<crate::build_modules::hardware_dts_parser::MmioPeripheral>,
+    // All MMIO regions allowed to access by the guest in the system.
+    allowed_addrs: &[MemoryRegion],
+) -> (Vec<MemoryRegion>, Vec<MmioPeripheral>) {
+    let mut allowed_aligned_passthrough_mmio_addrs: Vec<MemoryRegion> = Vec::new();
+    let mut allowed_peripherals: Vec<MmioPeripheral> = Vec::new();
 
     let mut i = 0;
-    let mut p_i = 0;
-    while i < allowed_addrs.len() && p_i < passthrough_mmio_regions.len() {
-        let addr = allowed_addrs[i][0];
-        let size = allowed_addrs[i][1];
+    for peripheral in mmio_peripherals {
+        let mut allowed_peripheral = MmioPeripheral {
+            regions: Vec::new(),
+            policy: peripheral.policy,
+            compatible: peripheral.compatible.clone(),
+        };
 
-        let p_addr = passthrough_mmio_regions[p_i][0];
-        let p_size = passthrough_mmio_regions[p_i][1];
+        'outer: for peripheral_region in &peripheral.regions {
+            loop {
+                let allowed_addr = allowed_addrs[i];
+                let contains = peripheral_region.contains(&allowed_addr);
+                if contains.is_eq() {
+                    // If the address is passthrough and page-aligned, stage it for GPT entry generation.
+                    // Otherwise, route it to the fallback emulation vector.
+                    if allowed_addr.is_aligned() && !peripheral.is_emulate() {
+                        allowed_aligned_passthrough_mmio_addrs.push(allowed_addr);
+                    } else {
+                        allowed_peripheral.regions.push(allowed_addr);
+                    }
+                } else if contains.is_gt() {
+                    // If the allowed region base address exceeds the peripheral base address,
+                    // advance to the next peripheral.
+                    break;
+                }
+                // If the region address is below the peripheral range, skip to the next allowed region.
+                i += 1;
 
-        // Add region if it belongs to an allowed zone.
-        if p_addr <= addr && (addr + size) <= (p_addr + p_size) {
-            // Check if the address is 4 KiB page-aligned
-            if (addr & 4095) == 0 && (size & 4095) == 0 {
-                allowed_aligned_passthrough_mmio_addrs.push([addr, size]);
-            } else {
-                allowed_passthrough_mmio_addrs.push([addr, size]);
+                // If all allowed memory regions have been processed, terminate the loop execution.
+                if i == allowed_addrs.len() {
+                    break 'outer;
+                }
             }
-            i += 1;
-        } else if p_addr + p_size <= addr {
-            p_i += 1;
-        } else {
-            i += 1;
         }
+        allowed_peripherals.push(allowed_peripheral);
     }
-    (
-        allowed_aligned_passthrough_mmio_addrs,
-        allowed_passthrough_mmio_addrs,
-    )
+    (allowed_aligned_passthrough_mmio_addrs, allowed_peripherals)
 }

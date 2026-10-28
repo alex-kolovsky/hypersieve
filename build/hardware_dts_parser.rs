@@ -1,6 +1,66 @@
-use std::collections::HashMap;
+use core::cmp::Ordering;
 
-pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64; 2]>>) {
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum MmioPolicy {
+    Emulate,
+    Passthrough,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct MemoryRegion {
+    pub base_addr: u64,
+    pub size: u64,
+}
+
+impl MemoryRegion {
+    pub fn end_addr(&self) -> u64 {
+        self.base_addr + self.size
+    }
+
+    pub fn contains(&self, memory_region: &MemoryRegion) -> Ordering {
+        // If the region overlaps with a parent region, return "Equal".
+        if (memory_region.base_addr >= self.base_addr && memory_region.base_addr <= self.end_addr())
+            || (memory_region.end_addr() >= self.base_addr
+                && memory_region.end_addr() <= self.end_addr())
+        {
+            Ordering::Equal
+        }
+        // If the region's base address sits above the parent region, return "Greater".
+        else if memory_region.base_addr > self.end_addr() {
+            Ordering::Greater
+        }
+        // If the region's base address sits under the parent region, return "Less".
+        else if memory_region.end_addr() < self.base_addr {
+            Ordering::Less
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn is_aligned(&self) -> bool {
+        (self.size & 4095 == 0) && (self.base_addr & 4095 == 0)
+    }
+
+    pub fn empty() -> Self {
+        MemoryRegion {
+            base_addr: 0x0,
+            size: 0x0,
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct MmioPeripheral {
+    pub regions: Vec<MemoryRegion>,
+    pub policy: MmioPolicy,
+    pub compatible: String,
+}
+
+impl MmioPeripheral {
+    pub fn is_emulate(&self) -> bool {
+        self.policy == MmioPolicy::Emulate
+    }
+}
+
+pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("hardware.dtb");
 
     // Compile Device Tree file.
@@ -11,10 +71,7 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
 
     let fdt = fdt::Fdt::new(&dtb_data).unwrap();
 
-    // The even-indexed array elements are the MMIO start addresses,
-    // and the odd-indexed ones are the end sizes.
-    let mut passthrough_memory_peripherals: Vec<[u64; 2]> = Vec::new();
-    let mut emulate_memory_peripherals: HashMap<Vec<String>, Vec<[u64; 2]>> = HashMap::new();
+    let mut mmio_peripherals: Vec<MmioPeripheral> = Vec::new();
 
     if let Some(soc) = fdt.find_node("/soc") {
         for peripheral in soc.children() {
@@ -24,17 +81,15 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
                 .as_str()
                 .unwrap();
 
-            let compatible: Vec<String> = peripheral
+            let compatible: String = peripheral
                 .property("compatible")
                 .expect("No compatible field in the hardware DTS")
                 .as_str()
                 .unwrap()
-                .split(",")
-                .map(String::from)
-                .collect();
+                .to_string();
 
             // Extract addresses of peripheral (reg).
-            let mut reg_addrs: Vec<[u64; 2]> = Vec::new();
+            let mut regions: Vec<MemoryRegion> = Vec::new();
 
             let reg = peripheral
                 .property("reg")
@@ -49,20 +104,28 @@ pub fn parse_dts(out_dir: &str) -> (Vec<[u64; 2]>, HashMap<Vec<String>, Vec<[u64
             let (chunks, _remainder) = reg_raw.as_chunks::<8>();
 
             for bytes in chunks.chunks(2) {
-                let addr: u64 = u64::from_be_bytes(bytes[0]);
+                let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);
-                reg_addrs.push([addr, size]);
+                regions.push(MemoryRegion { base_addr, size })
             }
 
-            if memory_policy_str == "emulate" {
-                emulate_memory_peripherals.insert(compatible, reg_addrs);
+            regions.sort_by_key(|memory_region| memory_region.base_addr);
+
+            let policy = if memory_policy_str == "emulate" {
+                MmioPolicy::Emulate
             } else if memory_policy_str == "passthrough" {
-                passthrough_memory_peripherals.extend(reg_addrs.iter());
+                MmioPolicy::Passthrough
             } else {
                 panic!("Unsupported memory policy");
-            }
+            };
+
+            mmio_peripherals.push(MmioPeripheral {
+                regions,
+                policy,
+                compatible,
+            })
         }
     }
-    passthrough_memory_peripherals.sort_by_key(|chunk| chunk[0]);
-    (passthrough_memory_peripherals, emulate_memory_peripherals)
+    mmio_peripherals.sort_by_key(|mmio_peripheral| mmio_peripheral.regions[0].base_addr);
+    mmio_peripherals
 }

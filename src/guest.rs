@@ -1,5 +1,5 @@
 use crate::{
-    GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_PASSTHROUGH_REGIONS_COUNT,
+    GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_ALLOWED_MMIO_REGIONS_COUNT,
     MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST,
     allocator::alloc_pages,
     guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
@@ -9,6 +9,15 @@ use core::{
     cell::UnsafeCell,
     sync::atomic::{AtomicUsize, Ordering},
 };
+
+#[derive(Debug)]
+pub struct MmioMemoryRegion {
+    pub base_addr: u64,
+    pub size: u64,
+
+    // The 'emulation_fn' is a pointer to the handler responsible for emulating access to this region.
+    pub emulation_fn: Option<fn(crate::trap::page_fault::PageFaultInfo)>,
+}
 
 #[derive(Debug)]
 pub struct Guest {
@@ -22,8 +31,8 @@ pub struct Guest {
     pub assigned_hart_capacity: usize,
     pub assigned_harts: [Option<u32>; MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST],
     pub data: &'static [u8],
-    pub aligned_passthrough_mmio_regions: [[u64; 2]; MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT],
-    pub passthrough_mmio_regions: [[u64; 2]; MAX_PASSTHROUGH_REGIONS_COUNT],
+    pub aligned_passthrough_mmio_regions: [MmioMemoryRegion; MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT],
+    pub allowed_mmio_memory_region: [MmioMemoryRegion; MAX_ALLOWED_MMIO_REGIONS_COUNT],
 }
 
 // The Guest struct is thread-safe if we never change Option::None to Option::Some or vice versa after waking the harts up.
@@ -128,9 +137,9 @@ pub fn initialize_guests() {
                         allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
 
                     // Initialize aligned MMIO addresses.
-                    for addr in guest.aligned_passthrough_mmio_regions {
-                        if addr[0] != 0 {
-                            page_table.map(addr[0], addr[0], PTE_R | PTE_W);
+                    for region in &guest.aligned_passthrough_mmio_regions {
+                        if region.base_addr != 0 {
+                            page_table.map(region.base_addr, region.base_addr, PTE_R | PTE_W);
                         }
                     }
 

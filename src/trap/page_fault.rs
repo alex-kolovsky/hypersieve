@@ -1,6 +1,11 @@
 use crate::{read_csr, vcpu::Vcpu, vcpu::Vr};
 use core::cmp::Ordering;
 
+#[allow(dead_code)]
+pub struct PageFaultInfo<'a> {
+    vcpu_ref: &'a mut Vcpu,
+}
+
 #[inline(always)]
 pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     // Load/Store Guest Page Fault
@@ -15,9 +20,9 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     // If the address is in the system MMIO window, process it; otherwise, allocate a page.
     let is_mmio = crate::SYSTEM_MMIO_WINDOWS
         .binary_search_by(|region| {
-            if requested_guest_addr < region[0] {
+            if requested_guest_addr < region.base_addr {
                 Ordering::Greater
-            } else if requested_guest_addr > region[0] + region[1] {
+            } else if requested_guest_addr > region.base_addr + region.size {
                 Ordering::Less
             } else {
                 Ordering::Equal
@@ -52,49 +57,59 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
 fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &crate::Guest) {
     // If this is an allowed MMIO address, perform a write to it; otherwise, throw an exception to the guest.
     let search_result = current_guest
-        .passthrough_mmio_regions
+        .allowed_mmio_memory_region
         .binary_search_by(|region| {
-            if requested_guest_addr < region[0] {
+            if requested_guest_addr < region.base_addr {
                 Ordering::Greater
-            } else if requested_guest_addr > region[0] + region[1] {
+            } else if requested_guest_addr > region.base_addr + region.size {
                 Ordering::Less
             } else {
                 Ordering::Equal
             }
         });
 
-    if let Ok(passthrough_mmio_id) = search_result {
+    if let Ok(mmio_id) = search_result {
         // Htinst CSR contains the transformed instruction that caused the fault.
         let htinst = read_csr!("htinst");
-        let opcode = htinst & 0x7F;
 
-        // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
-        // Otherwise, instruction is scalar.
-        if htinst == 0x0 {
-            // Fetch the instruction from the address we got from the 'sepc' CSR.
-            let executed_instruction_address = vcpu_ref.sepc;
-            let mut instruction: u32;
-            unsafe {
-                core::arch::asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
-            }
-
-            handle_vector_instruction(
-                vcpu_ref,
-                instruction,
-                current_guest,
-                passthrough_mmio_id,
-                requested_guest_addr,
-            );
-        } else if opcode == 0x2F {
-            handle_amo(htinst, requested_guest_addr, vcpu_ref);
+        // Emulate if a handler is present; otherwise, use hardware passthrough.
+        if let Some(function) = current_guest.allowed_mmio_memory_region[mmio_id].emulation_fn {
+            let page_fault_info = PageFaultInfo { vcpu_ref };
+            function(page_fault_info);
         } else {
-            handle_scalar_instruction(
-                vcpu_ref,
-                htinst,
-                current_guest,
-                requested_guest_addr,
-                passthrough_mmio_id,
-            );
+            let opcode = htinst & 0x7F;
+
+            // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
+            // Otherwise, instruction is scalar.
+            if htinst == 0x0 {
+                // Fetch the instruction from the address we got from the 'sepc' CSR.
+                let executed_instruction_address = vcpu_ref.sepc;
+                let mut instruction: u32;
+                unsafe {
+                    core::arch::asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+                }
+
+                handle_vector_instruction(
+                    vcpu_ref,
+                    instruction,
+                    current_guest,
+                    mmio_id,
+                    requested_guest_addr,
+                );
+            // If the htinst opcode is 0x2F, it is an Atomic Memory Operation (AMO).
+            } else if opcode == 0x2F {
+                // AMOs require specialized handling compared to standard load/store instructions.
+                // Each AMO variant must be decoded individually to emulate its unique operation.
+                handle_amo(htinst, requested_guest_addr, vcpu_ref);
+            } else {
+                handle_scalar_instruction(
+                    vcpu_ref,
+                    htinst,
+                    current_guest,
+                    requested_guest_addr,
+                    mmio_id,
+                );
+            }
         }
 
         // Get an instruction size in bytes by processing the quadrant.
@@ -131,8 +146,8 @@ fn handle_scalar_instruction(
     let size = 1 << width_field;
 
     // Inject a guest exception if the requested access overflows the MMIO region boundaries.
-    let max_size = (current_guest.passthrough_mmio_regions[passthrough_mmio_id][0]
-        + current_guest.passthrough_mmio_regions[passthrough_mmio_id][1])
+    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id].base_addr
+        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id].size)
         - requested_guest_addr;
 
     // Match the 7-bit opcode to determine the register file type (GPR vs. FPR)
@@ -251,8 +266,8 @@ fn handle_vector_instruction(
     };
 
     // Inject a guest exception if the requested access overflows the MMIO region boundaries.
-    let max_size = (current_guest.passthrough_mmio_regions[passthrough_mmio_id][0]
-        + current_guest.passthrough_mmio_regions[passthrough_mmio_id][1])
+    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id].base_addr
+        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id].size)
         - requested_guest_addr;
 
     let opcode = inst & 0x7F;

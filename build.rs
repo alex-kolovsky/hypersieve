@@ -1,3 +1,5 @@
+use crate::build_modules::hardware_dts_parser::{MemoryRegion, MmioPeripheral};
+
 #[path = "build/mod.rs"]
 mod build_modules;
 
@@ -7,27 +9,8 @@ struct Guest {
     hart_capacity: usize,
     assigned_harts: Vec<Option<u32>>,
     path: String,
-    aligned_passthrough_mmio_regions: Vec<[u64; 2]>,
-    passthrough_mmio_regions: Vec<[u64; 2]>,
-}
-impl Guest {
-    fn new(
-        entry_gpa: usize,
-        hart_capacity: usize,
-        assigned_harts: Vec<Option<u32>>,
-        path: String,
-        aligned_passthrough_mmio_regions: Vec<[u64; 2]>,
-        passthrough_mmio_regions: Vec<[u64; 2]>,
-    ) -> Self {
-        Self {
-            entry_gpa,
-            hart_capacity,
-            assigned_harts,
-            path,
-            passthrough_mmio_regions,
-            aligned_passthrough_mmio_regions,
-        }
-    }
+    aligned_passthrough_mmio_regions: Vec<MemoryRegion>,
+    allowed_mmio_peripherals: Vec<MmioPeripheral>,
 }
 
 #[derive(Debug, Default)]
@@ -43,12 +26,11 @@ fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
     // Compile and parse the hardware device tree file.
-    let (passthrough_memory_peripherals, _emulate_memory_peripherals) =
-        build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
+    let memory_peripherals = build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
 
     // Compile and parse the main device tree file.
     let mut hypervisor_configuration =
-        build_modules::main_dts_parser::parse_dts(out_dir.as_str(), passthrough_memory_peripherals);
+        build_modules::main_dts_parser::parse_dts(out_dir.as_str(), memory_peripherals);
 
     // Generate vector extension support file.
     build_modules::vector_extension_support::generate_vector_extension_support(
@@ -62,15 +44,14 @@ fn main() {
         hypervisor_configuration.floating_point_extension,
     );
 
+    // Parse the driver configuration file.
+    let drivers_config = crate::build_modules::drivers::parse();
+
     // Generate guest constants file.
     build_modules::guest_constants::generate_guest_constants(
         out_dir.as_str(),
-        &mut hypervisor_configuration.guests,
-        hypervisor_configuration.max_supported_harts_per_guest,
-        hypervisor_configuration.max_supported_assigned_harts_per_guest,
-        hypervisor_configuration.max_aligned_passthrough_mmio_regions_count,
-        hypervisor_configuration.max_passthrough_mmio_regions_count,
-        hypervisor_configuration.system_mmio_windows,
+        &mut hypervisor_configuration,
+        drivers_config,
     );
 
     // Generate hart constants file.

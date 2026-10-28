@@ -6,7 +6,7 @@ use core::{arch::naked_asm, mem::offset_of};
 
 mod ecall;
 mod fatal_exception;
-mod page_fault;
+pub mod page_fault;
 
 const SXLEN: u8 = 64;
 
