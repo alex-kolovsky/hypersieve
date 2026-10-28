@@ -1,5 +1,6 @@
 use crate::{
     registers::{self},
+    trap::causes::{exceptions, interrupts},
     vcpu::Vcpu,
 };
 use core::{arch::naked_asm, mem::offset_of};
@@ -199,12 +200,14 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
 
     match interrupt_bit {
         // Synchronous exception
-        0 => match exception_code {
+        causes::EXCEPTION => match exception_code {
             // Ecall
-            10 => ecall::handle_ecall(vcpu_ref),
+            exceptions::ENV_CALL_FROM_VS_MODE => ecall::handle_ecall(vcpu_ref),
 
             // Load guest-page fault or Store/AMO guest-page fault
-            23 | 21 => page_fault::handle_load_store_page_fault(vcpu_ref, exception_code),
+            exceptions::LOAD_GUEST_PAGE_FAULT | exceptions::STORE_GUEST_PAGE_FAULT => {
+                page_fault::handle_load_store_page_fault(vcpu_ref, exception_code)
+            }
 
             _ => fatal_exception::fatal_exception(
                 exception_code,
@@ -214,10 +217,10 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
         },
 
         // Asynchronous interrupt
-        1 => {
+        causes::INTERRUPT => {
             match exception_code {
                 // Timer interrupt
-                6 => {
+                interrupts::VIRTUAL_SUPERVISOR_TIMER => {
                     vcpu_ref.run_next_guest();
                 }
 

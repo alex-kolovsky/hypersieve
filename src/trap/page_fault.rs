@@ -1,6 +1,6 @@
 use crate::{
     read_csr,
-    trap::causes::Exception,
+    trap::causes::exceptions,
     vcpu::{Vcpu, Vr},
 };
 use core::cmp::Ordering;
@@ -40,7 +40,7 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     } else {
         // If the guest tried to read a non-existent page, raise the page fault.
         if exception_code == 21 {
-            inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault)
+            inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT)
         }
 
         // Otherwise, allocate a 4KiB-sized page for the guest.
@@ -101,7 +101,7 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
         vcpu_ref.sepc += instruction_size as u64;
         vcpu_ref.run();
     } else {
-        inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
+        inject_fault(vcpu_ref, requested_guest_addr, exceptions::STORE_PAGE_FAULT);
     }
 }
 
@@ -186,10 +186,10 @@ fn handle_scalar_instruction(
                     inject_fault(
                         vcpu_ref,
                         requested_guest_addr,
-                        Exception::LoadAddressMisaligned,
+                        exceptions::LOAD_ADDRESS_MISALIGNED,
                     )
                 }
-                inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault);
+                inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT);
             }
 
             match opcode {
@@ -205,7 +205,7 @@ fn handle_scalar_instruction(
         }
         false => {
             if size > max_size {
-                inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
+                inject_fault(vcpu_ref, requested_guest_addr, exceptions::STORE_PAGE_FAULT);
             }
 
             match opcode {
@@ -307,7 +307,7 @@ fn handle_vector_instruction(
         // Vector store
         0x27 => {
             if size > max_size {
-                inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
+                inject_fault(vcpu_ref, requested_guest_addr, exceptions::STORE_PAGE_FAULT);
             }
 
             // Get the value to be stored from the array of saved vector registers.
@@ -318,7 +318,7 @@ fn handle_vector_instruction(
         // Vector load
         0x07 => {
             if size > max_size {
-                inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault);
+                inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT);
             }
 
             vcpu_ref.vrs[vs3_id] = vector_load(size, requested_guest_addr);
@@ -424,14 +424,14 @@ fn handle_amo(htinst: u64, requested_guest_addr: u64, vcpu_ref: &mut Vcpu) {
     vcpu_ref.gprs[rd as usize] = mem_val;
 }
 
-fn inject_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, cause: Exception) -> ! {
+fn inject_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, cause: u64) -> ! {
     // Inject the Store/AMO Guest Page Fault
 
     // Set the failed instruction address to the guest's sepc (vsepc) CSR.
     vcpu_ref.vsepc = vcpu_ref.sepc;
 
     // Set the vscause CSR (guest's scause) to the cause of the fault.
-    vcpu_ref.vscause = cause as u64;
+    vcpu_ref.vscause = cause;
 
     // Set the failed address to guest's stval (vstval) CSR.
     vcpu_ref.vstval = requested_guest_addr;
