@@ -35,7 +35,7 @@ second_hart:
     li a0, 'U'
     li a1, 0x10000000
     amoswap.w zero, a0, (a1)
-    li a1, 0xFFFFFFFFDEFEC8ED
+    li a1, 0xFFFFFFFFDEADBEEF
     sw a0, 0(a1)
 
     # sw a0, 0(a1)

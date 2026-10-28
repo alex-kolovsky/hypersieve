@@ -14,5 +14,12 @@
 			// Memory policy; either 'passthrough' or 'emulate'.
 			memory-policy = "passthrough";
 		};
+		m: serial@FFFFFFFFDEADBEEF {
+            compatible = "m";
+
+			reg = <0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;
+
+			memory-policy = "emulate";
+		};
 	};
 };

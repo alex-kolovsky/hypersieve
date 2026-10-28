@@ -19,7 +19,7 @@
         // The greater the number of such windows, the slower the hypervisor becomes.
         // Elements 0-1: MMIO base address (0x00000000_00000000)
         // Elements 2-3: Size (0x00000000_70000000)
-     	mmio-windows = <0x0 0x0 0x0 0x70000000>;
+     	mmio-windows = <0x0 0x0 0x0 0x70000000 0xF0000000 0x0 0x0FFFFFFF 0xFFFFFFFF>;
 
         // Configuration for the first guest VM.
         vm0 {
@@ -40,7 +40,7 @@
             // Elements 2-3: Size (The exact accessible byte-span of the registers)
             // The greater the number of allowed MMIO regions, the slower the hypervisor becomes.
             // If the base address and the size are not Page-Aligned, accessing them will be significantly slower.
-            allowed-mmio = <0x0 0x10000000 0x0 0x8>;
+            allowed-mmio = <0x0 0x10000000 0x0 0x1 0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;
 
             // Virtual address of the guest entry.
             entry = <0x0>;
@@ -51,7 +51,7 @@
             path = "target/guest-2/guest-2.bin";
 
             hart-capacity = <2>;
-            allowed-mmio = <0x0 0x10000000 0x0 0x8>;
+            allowed-mmio = <0x0 0x10000000 0x0 0x1>;
 
             entry = <0x100000>;
         };

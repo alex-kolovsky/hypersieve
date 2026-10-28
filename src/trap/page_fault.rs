@@ -6,9 +6,13 @@ use crate::{
 use core::cmp::Ordering;
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct PageFaultInfo<'a> {
-    vcpu_ref: &'a mut Vcpu,
-    htinst: u64,
+    pub vcpu_ref: &'a mut Vcpu,
+    pub htinst: u64,
+    pub current_guest: &'a crate::guest::Guest,
+    pub mmio_id: usize,
+    pub requested_guest_addr: u64,
 }
 
 #[inline(always)]
@@ -42,7 +46,6 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
         if exception_code == 21 {
             inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT)
         }
-
         // Otherwise, allocate a 4KiB-sized page for the guest.
         let locked_page_table = current_guest.page_table.lock();
         locked_page_table.map_and_allocate(
@@ -81,7 +84,13 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
         if let Some(emulation_function) =
             current_guest.allowed_mmio_memory_region[mmio_id].emulation_fn
         {
-            let page_fault_info = PageFaultInfo { vcpu_ref, htinst };
+            let page_fault_info = PageFaultInfo {
+                vcpu_ref,
+                htinst,
+                current_guest,
+                mmio_id,
+                requested_guest_addr,
+            };
             emulation_function(page_fault_info);
         } else {
             handle_aligned_passthrough_mmio(
@@ -179,16 +188,17 @@ fn handle_scalar_instruction(
     let opcode = htinst & 0x7F;
     let is_load = (opcode & 0x20) == 0;
 
+    if requested_guest_addr & (size - 1) != 0 {
+        inject_fault(
+            vcpu_ref,
+            requested_guest_addr,
+            exceptions::LOAD_ADDRESS_MISALIGNED,
+        )
+    }
+
     match is_load {
         true => {
             if size > max_size {
-                if requested_guest_addr & (size - 1) != 0 {
-                    inject_fault(
-                        vcpu_ref,
-                        requested_guest_addr,
-                        exceptions::LOAD_ADDRESS_MISALIGNED,
-                    )
-                }
                 inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT);
             }
 
@@ -225,7 +235,7 @@ fn handle_scalar_instruction(
 }
 
 #[inline(always)]
-fn scalar_write(size: u64, requested_guest_addr: u64, value_to_store: u64) {
+pub fn scalar_write(size: u64, requested_guest_addr: u64, value_to_store: u64) {
     // Write the value to the requested address.
     match size {
         1 => unsafe {
@@ -247,7 +257,7 @@ fn scalar_write(size: u64, requested_guest_addr: u64, value_to_store: u64) {
 }
 
 #[inline(always)]
-fn scalar_load(size: u64, requested_guest_addr: u64) -> u64 {
+pub fn scalar_load(size: u64, requested_guest_addr: u64) -> u64 {
     // Write the value to the requested address.
     match size {
         1 => unsafe { core::ptr::read_volatile(requested_guest_addr as *mut u8) as u64 },
@@ -303,6 +313,13 @@ fn handle_vector_instruction(
 
     let opcode = inst & 0x7F;
 
+    if requested_guest_addr & (size - 1) != 0 {
+        inject_fault(
+            vcpu_ref,
+            requested_guest_addr,
+            exceptions::LOAD_ADDRESS_MISALIGNED,
+        )
+    }
     match opcode {
         // Vector store
         0x27 => {
@@ -328,7 +345,7 @@ fn handle_vector_instruction(
 }
 
 #[inline(always)]
-fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: crate::vcpu::Vr) {
+pub fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: crate::vcpu::Vr) {
     // Write the value to the requested address.
     match size {
         1 => unsafe {
@@ -354,7 +371,7 @@ fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: crate::vcp
 }
 
 #[inline(always)]
-fn vector_load(size: u64, requested_guest_addr: u64) -> Vr {
+pub fn vector_load(size: u64, requested_guest_addr: u64) -> Vr {
     let mut vr: Vr = [0; crate::VLEN / 32];
     match size {
         1 => unsafe {
@@ -424,7 +441,7 @@ fn handle_amo(htinst: u64, requested_guest_addr: u64, vcpu_ref: &mut Vcpu) {
     vcpu_ref.gprs[rd as usize] = mem_val;
 }
 
-fn inject_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, cause: u64) -> ! {
+pub fn inject_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, cause: u64) -> ! {
     // Inject the Store/AMO Guest Page Fault
 
     // Set the failed instruction address to the guest's sepc (vsepc) CSR.
