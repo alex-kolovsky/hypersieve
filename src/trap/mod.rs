@@ -4,6 +4,7 @@ use crate::{
 };
 use core::{arch::naked_asm, mem::offset_of};
 
+pub mod causes;
 mod ecall;
 mod fatal_exception;
 pub mod page_fault;

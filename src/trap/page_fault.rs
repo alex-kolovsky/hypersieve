@@ -1,9 +1,14 @@
-use crate::{read_csr, vcpu::Vcpu, vcpu::Vr};
+use crate::{
+    read_csr,
+    trap::causes::Exception,
+    vcpu::{Vcpu, Vr},
+};
 use core::cmp::Ordering;
 
 #[allow(dead_code)]
 pub struct PageFaultInfo<'a> {
     vcpu_ref: &'a mut Vcpu,
+    htinst: u64,
 }
 
 #[inline(always)]
@@ -35,7 +40,7 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     } else {
         // If the guest tried to read a non-existent page, raise the page fault.
         if exception_code == 21 {
-            inject_load_page_fault(vcpu_ref, requested_guest_addr)
+            inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault)
         }
 
         // Otherwise, allocate a 4KiB-sized page for the guest.
@@ -73,43 +78,19 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
         let htinst = read_csr!("htinst");
 
         // Emulate if a handler is present; otherwise, use hardware passthrough.
-        if let Some(function) = current_guest.allowed_mmio_memory_region[mmio_id].emulation_fn {
-            let page_fault_info = PageFaultInfo { vcpu_ref };
-            function(page_fault_info);
+        if let Some(emulation_function) =
+            current_guest.allowed_mmio_memory_region[mmio_id].emulation_fn
+        {
+            let page_fault_info = PageFaultInfo { vcpu_ref, htinst };
+            emulation_function(page_fault_info);
         } else {
-            let opcode = htinst & 0x7F;
-
-            // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
-            // Otherwise, instruction is scalar.
-            if htinst == 0x0 {
-                // Fetch the instruction from the address we got from the 'sepc' CSR.
-                let executed_instruction_address = vcpu_ref.sepc;
-                let mut instruction: u32;
-                unsafe {
-                    core::arch::asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
-                }
-
-                handle_vector_instruction(
-                    vcpu_ref,
-                    instruction,
-                    current_guest,
-                    mmio_id,
-                    requested_guest_addr,
-                );
-            // If the htinst opcode is 0x2F, it is an Atomic Memory Operation (AMO).
-            } else if opcode == 0x2F {
-                // AMOs require specialized handling compared to standard load/store instructions.
-                // Each AMO variant must be decoded individually to emulate its unique operation.
-                handle_amo(htinst, requested_guest_addr, vcpu_ref);
-            } else {
-                handle_scalar_instruction(
-                    vcpu_ref,
-                    htinst,
-                    current_guest,
-                    requested_guest_addr,
-                    mmio_id,
-                );
-            }
+            handle_aligned_passthrough_mmio(
+                htinst,
+                vcpu_ref,
+                current_guest,
+                mmio_id,
+                requested_guest_addr,
+            );
         }
 
         // Get an instruction size in bytes by processing the quadrant.
@@ -120,7 +101,50 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
         vcpu_ref.sepc += instruction_size as u64;
         vcpu_ref.run();
     } else {
-        inject_store_page_fault(vcpu_ref, requested_guest_addr);
+        inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
+    }
+}
+
+#[inline(always)]
+fn handle_aligned_passthrough_mmio(
+    htinst: u64,
+    vcpu_ref: &mut Vcpu,
+    current_guest: &crate::Guest,
+    mmio_id: usize,
+    requested_guest_addr: u64,
+) {
+    let opcode = htinst & 0x7F;
+
+    // An htinst value of 0x0 indicates a non-transformable instruction (e.g., Vector Store);
+    // Otherwise, instruction is scalar.
+    if htinst == 0x0 {
+        // Fetch the instruction from the address we got from the 'sepc' CSR.
+        let executed_instruction_address = vcpu_ref.sepc;
+        let mut instruction: u32;
+        unsafe {
+            core::arch::asm!("hlv.w {inst}, 0({addr})", inst = out(reg) instruction, addr = in(reg) executed_instruction_address);
+        }
+
+        handle_vector_instruction(
+            vcpu_ref,
+            instruction,
+            current_guest,
+            mmio_id,
+            requested_guest_addr,
+        );
+    // If the htinst opcode is 0x2F, it is an Atomic Memory Operation (AMO).
+    } else if opcode == 0x2F {
+        // AMOs require specialized handling compared to standard load/store instructions.
+        // Each AMO variant must be decoded individually to emulate its unique operation.
+        handle_amo(htinst, requested_guest_addr, vcpu_ref);
+    } else {
+        handle_scalar_instruction(
+            vcpu_ref,
+            htinst,
+            current_guest,
+            requested_guest_addr,
+            mmio_id,
+        );
     }
 }
 
@@ -158,7 +182,14 @@ fn handle_scalar_instruction(
     match is_load {
         true => {
             if size > max_size {
-                inject_load_page_fault(vcpu_ref, requested_guest_addr);
+                if requested_guest_addr & (size - 1) != 0 {
+                    inject_fault(
+                        vcpu_ref,
+                        requested_guest_addr,
+                        Exception::LoadAddressMisaligned,
+                    )
+                }
+                inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault);
             }
 
             match opcode {
@@ -174,7 +205,7 @@ fn handle_scalar_instruction(
         }
         false => {
             if size > max_size {
-                inject_store_page_fault(vcpu_ref, requested_guest_addr);
+                inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
             }
 
             match opcode {
@@ -276,7 +307,7 @@ fn handle_vector_instruction(
         // Vector store
         0x27 => {
             if size > max_size {
-                inject_store_page_fault(vcpu_ref, requested_guest_addr);
+                inject_fault(vcpu_ref, requested_guest_addr, Exception::StorePageFault);
             }
 
             // Get the value to be stored from the array of saved vector registers.
@@ -287,7 +318,7 @@ fn handle_vector_instruction(
         // Vector load
         0x07 => {
             if size > max_size {
-                inject_load_page_fault(vcpu_ref, requested_guest_addr);
+                inject_fault(vcpu_ref, requested_guest_addr, Exception::LoadPageFault);
             }
 
             vcpu_ref.vrs[vs3_id] = vector_load(size, requested_guest_addr);
@@ -393,33 +424,14 @@ fn handle_amo(htinst: u64, requested_guest_addr: u64, vcpu_ref: &mut Vcpu) {
     vcpu_ref.gprs[rd as usize] = mem_val;
 }
 
-fn inject_store_page_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64) -> ! {
+fn inject_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, cause: Exception) -> ! {
     // Inject the Store/AMO Guest Page Fault
 
     // Set the failed instruction address to the guest's sepc (vsepc) CSR.
     vcpu_ref.vsepc = vcpu_ref.sepc;
 
-    // Set the vscause CSR (guest's scause) to a 'Store/AMO page fault'.
-    vcpu_ref.vscause = 15;
-
-    // Set the failed address to guest's stval (vstval) CSR.
-    vcpu_ref.vstval = requested_guest_addr;
-
-    // Set the guest's PC to the guest's trap handler address (mask out the lower 2 bits which encode the 'Mode').
-    vcpu_ref.sepc = vcpu_ref.vstvec & !0b11;
-
-    // Return to the guest.
-    vcpu_ref.run();
-}
-
-fn inject_load_page_fault(vcpu_ref: &mut Vcpu, requested_guest_addr: u64) -> ! {
-    // Inject the Load Page Fault
-
-    // Set the failed instruction address to the guest's sepc (vsepc) CSR.
-    vcpu_ref.vsepc = vcpu_ref.sepc;
-
-    // Set the vscause CSR (guest's scause) to a 'Load page fault'.
-    vcpu_ref.vscause = 13;
+    // Set the vscause CSR (guest's scause) to the cause of the fault.
+    vcpu_ref.vscause = cause as u64;
 
     // Set the failed address to guest's stval (vstval) CSR.
     vcpu_ref.vstval = requested_guest_addr;
