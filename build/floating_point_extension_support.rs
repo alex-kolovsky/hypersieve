@@ -25,6 +25,8 @@ fn add_floating_point_extension_support(floating_point_extension_support_file: &
 #[unsafe(naked)]
 extern \"C\" fn save_fprs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
+        \".option push\",
+        \".option arch, +f, +d\",
         \"fsd f0, {{f0_offset}}(a0)\",
         \"fsd f1, {{f1_offset}}(a0)\",
         \"fsd f2, {{f2_offset}}(a0)\",
@@ -57,6 +59,7 @@ extern \"C\" fn save_fprs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"fsd f29, {{f29_offset}}(a0)\",
         \"fsd f30, {{f30_offset}}(a0)\",
         \"fsd f31, {{f31_offset}}(a0)\",
+        \".option pop\",
         \"ret\",
         f0_offset = const offset_of!(crate::vcpu::Vcpu, fprs),
         f1_offset = const offset_of!(crate::vcpu::Vcpu, fprs) + 8 * 1,
@@ -96,6 +99,8 @@ extern \"C\" fn save_fprs(vcpu: *mut crate::vcpu::Vcpu) {{
 #[unsafe(naked)]
 extern \"C\" fn restore_fprs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
+        \".option push\",
+        \".option arch, +f, +d\",
         \"fld f0, {{f0_offset}}(a0)\",
         \"fld f1, {{f1_offset}}(a0)\",
         \"fld f2, {{f2_offset}}(a0)\",
@@ -128,6 +133,7 @@ extern \"C\" fn restore_fprs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"fld f29, {{f29_offset}}(a0)\",
         \"fld f30, {{f30_offset}}(a0)\",
         \"fld f31, {{f31_offset}}(a0)\",
+        \".option pop\",
         \"ret\",
         f0_offset = const offset_of!(crate::vcpu::Vcpu, fprs),
         f1_offset = const offset_of!(crate::vcpu::Vcpu, fprs) + 8 * 1,

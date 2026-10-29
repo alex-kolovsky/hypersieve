@@ -26,6 +26,8 @@ pub const VLEN: usize = {vlen};
 extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
         // Store vector CSRs.
+        \".option push\",
+        \".option arch, +v\",
         \"csrr t0, vl\",
         \"sd t0, {{vl_offset}}(a0)\",
         \"csrr t0, vtype\",
@@ -98,6 +100,7 @@ extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vs1r.v v30, (t0)\",
         \"add t0, t0, t1\",
         \"vs1r.v v31, (t0)\",
+        \".option pop\",
         \"ret\",
         vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
@@ -109,6 +112,8 @@ extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
 extern \"C\" fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
     naked_asm!(
         // Load vector CSRs.
+        \".option push\",
+        \".option arch, +v\",
         \"ld t0, {{vl_offset}}(a0)\",
         \"ld t1, {{vtype_offset}}(a0)\",
         \"vsetvl x0, t0, t1\",
@@ -180,6 +185,7 @@ extern \"C\" fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vl1r.v v30, (t0)\",
         \"add t0, t0, t1\",
         \"vl1r.v v31, (t0)\",
+        \".option pop\",
         \"ret\",
         vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
         vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
