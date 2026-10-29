@@ -13,6 +13,7 @@ pub struct Vcpu {
 
     pub host_hart_id: usize,
     pub guest_id_for_hart: usize,
+
     // Host registers
     pub host_sp: u64,
 
@@ -48,14 +49,15 @@ pub struct Vcpu {
 impl Vcpu {
     pub const fn zeroed() -> Self {
         Self {
-            gprs: [0; 32],
             host_hart_id: 0,
             guest_id_for_hart: 0,
+
+            // General purpose registers
+            gprs: [0; 32],
 
             // Host registers
             host_sp: 0,
 
-            // General purpose registers
             // CSRs
             hstatus: 0,
             hgatp: 0,
@@ -126,7 +128,8 @@ impl Vcpu {
         let guest_id_for_hart = self.guest_id_for_hart;
         let host_hart_id = self.host_hart_id;
 
-        let current_guest = crate::guest::get_current_guest(&host_hart_id, &guest_id_for_hart);
+        let current_guest_id = crate::guest::get_current_guest_id(host_hart_id, guest_id_for_hart);
+        let current_guest = &crate::GUESTS[current_guest_id];
 
         let is_assigned = crate::multihart::is_hart_assigned(host_hart_id);
         let mut guest_id = guest_id_for_hart;
@@ -201,6 +204,7 @@ impl Vcpu {
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
 
         unsafe {
+            restore_extension_registers(next_guest);
             (*next_guest).vstimecmp = vstimecmp;
             (*next_guest).run();
         }
@@ -208,22 +212,17 @@ impl Vcpu {
 
     pub fn run(&mut self) -> ! {
         restore_extension_registers(self as *mut Vcpu);
-
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
         }
 
         unreachable!();
     }
+
     pub fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
         // Set guest supervisor timer compare value.
         let time = read_csr!("time");
         let vstimecmp = time + TIMER_OFFSET;
-
-        // Configure hgatp to enforce the guest physical memory mapping.
-        let page_table = GUESTS[guest_id_for_hart].page_table.lock();
-        self.hgatp = page_table.hgatp();
-        drop(page_table);
 
         self.guest_id_for_hart = guest_id_for_hart;
         self.host_hart_id = host_hart_id;
@@ -334,37 +333,37 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
         vsie_offset = const offset_of!(Vcpu, vsie),
         vsatp_offset = const offset_of!(Vcpu, vsatp),
 
-        ra_offset = const offset_of!(Vcpu, gprs) + 1 * 8,
-        sp_offset = const offset_of!(Vcpu, gprs) + 2 * 8,
-        gp_offset = const offset_of!(Vcpu, gprs) + 3 * 8,
-        tp_offset = const offset_of!(Vcpu, gprs) + 4 * 8,
-        t0_offset = const offset_of!(Vcpu, gprs) + 5 * 8,
-        t1_offset = const offset_of!(Vcpu, gprs) + 6 * 8,
-        t2_offset = const offset_of!(Vcpu, gprs) + 7 * 8,
-        s0_offset = const offset_of!(Vcpu, gprs) + 8 * 8,
-        s1_offset = const offset_of!(Vcpu, gprs) + 9 * 8,
-        a0_offset = const offset_of!(Vcpu, gprs) + 10 * 8,
-        a1_offset = const offset_of!(Vcpu, gprs) + 11 * 8,
-        a2_offset = const offset_of!(Vcpu, gprs) + 12 * 8,
-        a3_offset = const offset_of!(Vcpu, gprs) + 13 * 8,
-        a4_offset = const offset_of!(Vcpu, gprs) + 14 * 8,
-        a5_offset = const offset_of!(Vcpu, gprs) + 15 * 8,
-        a6_offset = const offset_of!(Vcpu, gprs) + 16 * 8,
-        a7_offset = const offset_of!(Vcpu, gprs) + 17 * 8,
-        s2_offset = const offset_of!(Vcpu, gprs) + 18 * 8,
-        s3_offset = const offset_of!(Vcpu, gprs) + 19 * 8,
-        s4_offset = const offset_of!(Vcpu, gprs) + 20 * 8,
-        s5_offset = const offset_of!(Vcpu, gprs) + 21 * 8,
-        s6_offset = const offset_of!(Vcpu, gprs) + 22 * 8,
-        s7_offset = const offset_of!(Vcpu, gprs) + 23 * 8,
-        s8_offset = const offset_of!(Vcpu, gprs) + 24 * 8,
-        s9_offset = const offset_of!(Vcpu, gprs) + 25 * 8,
-        s10_offset = const offset_of!(Vcpu, gprs) + 26 * 8,
-        s11_offset = const offset_of!(Vcpu, gprs) + 27 * 8,
-        t3_offset = const offset_of!(Vcpu, gprs) + 28 * 8,
-        t4_offset = const offset_of!(Vcpu, gprs) + 29 * 8,
-        t5_offset = const offset_of!(Vcpu, gprs) + 30 * 8,
-        t6_offset = const offset_of!(Vcpu, gprs) + 31 * 8,
+        ra_offset = const offset_of!(Vcpu, gprs) + registers::RA_OFFSET * 8,
+        sp_offset = const offset_of!(Vcpu, gprs) + registers::SP_OFFSET * 8,
+        gp_offset = const offset_of!(Vcpu, gprs) + registers::GP_OFFSET * 8,
+        tp_offset = const offset_of!(Vcpu, gprs) + registers::TP_OFFSET * 8,
+        t0_offset = const offset_of!(Vcpu, gprs) + registers::T0_OFFSET * 8,
+        t1_offset = const offset_of!(Vcpu, gprs) + registers::T1_OFFSET * 8,
+        t2_offset = const offset_of!(Vcpu, gprs) + registers::T2_OFFSET * 8,
+        s0_offset = const offset_of!(Vcpu, gprs) + registers::S0_OFFSET * 8,
+        s1_offset = const offset_of!(Vcpu, gprs) + registers::S1_OFFSET * 8,
+        a0_offset = const offset_of!(Vcpu, gprs) + registers::A0_OFFSET * 8,
+        a1_offset = const offset_of!(Vcpu, gprs) + registers::A1_OFFSET * 8,
+        a2_offset = const offset_of!(Vcpu, gprs) + registers::A2_OFFSET * 8,
+        a3_offset = const offset_of!(Vcpu, gprs) + registers::A3_OFFSET * 8,
+        a4_offset = const offset_of!(Vcpu, gprs) + registers::A4_OFFSET * 8,
+        a5_offset = const offset_of!(Vcpu, gprs) + registers::A5_OFFSET * 8,
+        a6_offset = const offset_of!(Vcpu, gprs) + registers::A6_OFFSET * 8,
+        a7_offset = const offset_of!(Vcpu, gprs) + registers::A7_OFFSET * 8,
+        s2_offset = const offset_of!(Vcpu, gprs) + registers::S2_OFFSET * 8,
+        s3_offset = const offset_of!(Vcpu, gprs) + registers::S3_OFFSET * 8,
+        s4_offset = const offset_of!(Vcpu, gprs) + registers::S4_OFFSET * 8,
+        s5_offset = const offset_of!(Vcpu, gprs) + registers::S5_OFFSET * 8,
+        s6_offset = const offset_of!(Vcpu, gprs) + registers::S6_OFFSET * 8,
+        s7_offset = const offset_of!(Vcpu, gprs) + registers::S7_OFFSET * 8,
+        s8_offset = const offset_of!(Vcpu, gprs) + registers::S8_OFFSET * 8,
+        s9_offset = const offset_of!(Vcpu, gprs) + registers::S9_OFFSET * 8,
+        s10_offset = const offset_of!(Vcpu, gprs) + registers::S10_OFFSET * 8,
+        s11_offset = const offset_of!(Vcpu, gprs) + registers::S11_OFFSET * 8,
+        t3_offset = const offset_of!(Vcpu, gprs) + registers::T3_OFFSET * 8,
+        t4_offset = const offset_of!(Vcpu, gprs) + registers::T4_OFFSET * 8,
+        t5_offset = const offset_of!(Vcpu, gprs) + registers::T5_OFFSET * 8,
+        t6_offset = const offset_of!(Vcpu, gprs) + registers::T6_OFFSET * 8,
     );
 }
 

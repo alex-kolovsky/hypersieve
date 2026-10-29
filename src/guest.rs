@@ -116,7 +116,8 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> 
 }
 
 pub fn initialize_guests() {
-    // Initialize VCPUs and passthrough MMIO addresses for the guest VMs.
+    // Initialize all VCPUs (including those dedicated to assigned harts)
+    // and map passthrough MMIO addresses in their page tables.
     for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
@@ -136,6 +137,9 @@ pub fn initialize_guests() {
                     (*vcpu, page_table) =
                         allocate_guest_memory(guest.entry_gpa, guest.data, i as u64);
 
+                    // Configure hgatp to enforce the guest physical memory mapping.
+                    (*vcpu).hgatp = page_table.hgatp();
+
                     // Initialize aligned MMIO addresses.
                     for region in &guest.aligned_passthrough_mmio_regions {
                         if region.base_addr != 0 {
@@ -145,7 +149,7 @@ pub fn initialize_guests() {
 
                     *guest.page_table.lock() = page_table;
 
-                    // Load this vcpu pointer into guest.vcpu_ptrs[i].
+                    // Store this VCPU pointer into the guest's VCPU pointer array (guest.vcpu_ptrs[i]).
                     let mut vcpu_ptr = guest.vcpu_ptrs.lock();
                     (*vcpu_ptr)[i] = Some(vcpu);
                 } else {
@@ -167,7 +171,8 @@ pub fn initialize_guests() {
                         // First values of the vcpu_ptrs array are intended for assigned harts.
                         (*assigned_guests)[id] = (*vcpu_ptrs)[0].unwrap();
 
-                        // Remove the vcpu pointer of a assigned hart from the vcpu_ptrs array.
+                        // Clear the assigned hart VCPU pointers from
+                        // the Guest struct to prevent other harts from using them.
                         (*vcpu_ptrs)[0] = None;
                         (*vcpu_ptrs).rotate_left(1);
                     }
@@ -177,16 +182,16 @@ pub fn initialize_guests() {
     }
 }
 
-pub fn get_current_guest<'a>(hart_id: &'a usize, guest_id_for_hart: &'a usize) -> &'a crate::Guest {
+#[inline(always)]
+pub fn get_current_guest_id(hart_id: usize, guest_id_for_hart: usize) -> usize {
     // If hart is assigned, take a guest from the local array of dedicated guests.
-    if crate::multihart::is_hart_assigned(*hart_id) {
-        let hart = &crate::HARTS[*hart_id];
+    if crate::multihart::is_hart_assigned(hart_id) {
+        let hart = &crate::HARTS[hart_id];
 
-        let guest_id = hart.guests[*guest_id_for_hart];
-        &crate::GUESTS[guest_id.unwrap()]
+        hart.guests[guest_id_for_hart].unwrap()
 
     // If hart is not assigned, take a guest from the global guests array.
     } else {
-        &crate::GUESTS[*guest_id_for_hart]
+        guest_id_for_hart
     }
 }

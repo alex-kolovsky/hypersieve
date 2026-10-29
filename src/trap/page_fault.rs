@@ -23,8 +23,8 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     let host_hart_id = vcpu_ref.host_hart_id;
     let guest_id_for_hart = vcpu_ref.guest_id_for_hart;
 
-    let current_guest: &crate::Guest =
-        crate::guest::get_current_guest(&host_hart_id, &guest_id_for_hart);
+    let current_guest_id = crate::guest::get_current_guest_id(host_hart_id, guest_id_for_hart);
+    let current_guest = &crate::GUESTS[current_guest_id];
 
     // If the address is in the system MMIO window, process it; otherwise, allocate a page.
     let is_mmio = crate::SYSTEM_MMIO_WINDOWS

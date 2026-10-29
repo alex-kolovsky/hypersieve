@@ -130,7 +130,7 @@ pub static GUESTS: [Guest; {}] = [
                 .as_str(),
         );
         vcpus.push_str(
-            "None"
+            "None, "
                 .repeat(max_supported_harts_per_guest - guest.hart_capacity)
                 .as_str(),
         );
@@ -139,7 +139,7 @@ pub static GUESTS: [Guest; {}] = [
         // Extend 'assigned_harts' with default values up to MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST.
         guest.assigned_harts.extend(vec![
             None;
-            max_supported_harts_per_guest
+            max_supported_assigned_harts_per_guest
                 - guest.assigned_harts.len()
         ]);
 
