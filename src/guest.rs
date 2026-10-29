@@ -118,7 +118,7 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> 
 pub fn initialize_guests() {
     // Initialize all VCPUs (including those dedicated to assigned harts)
     // and map passthrough MMIO addresses in their page tables.
-    for (guest_id, guest) in GUESTS.iter().enumerate() {
+    for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
         for i in 0..(guest.hart_capacity + guest.assigned_hart_capacity) {
