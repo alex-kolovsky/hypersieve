@@ -31,7 +31,7 @@ static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
             hart_constants_file ,
             "
 Hart {{
-    assigned_guests: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
+    assigned_guest_vcpus: core::cell::UnsafeCell::new([core::ptr::null_mut(); MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
     guests: ["
         )
         .unwrap();

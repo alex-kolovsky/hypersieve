@@ -118,7 +118,7 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> 
 pub fn initialize_guests() {
     // Initialize all VCPUs (including those dedicated to assigned harts)
     // and map passthrough MMIO addresses in their page tables.
-    for guest in GUESTS.iter() {
+    for (guest_id, guest) in GUESTS.iter().enumerate() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
         for i in 0..(guest.hart_capacity + guest.assigned_hart_capacity) {
@@ -157,26 +157,25 @@ pub fn initialize_guests() {
                 }
             }
         }
+    }
 
-        // Initialize assigned hart pointers before booting the secondary cores.
-        for assigned_hart_id in guest.assigned_harts.iter().flatten() {
-            let assigned_guests = crate::HARTS[*assigned_hart_id as usize]
-                .assigned_guests
-                .get();
-
-            let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
-            unsafe {
-                for id in 0..(*assigned_guests).len() {
-                    if (*assigned_guests)[id].is_null() {
-                        // First values of the vcpu_ptrs array are intended for assigned harts.
-                        (*assigned_guests)[id] = (*vcpu_ptrs)[0].unwrap();
-
-                        // Clear the assigned hart VCPU pointers from
-                        // the Guest struct to prevent other harts from using them.
-                        (*vcpu_ptrs)[0] = None;
-                        (*vcpu_ptrs).rotate_left(1);
-                    }
+    // Initialize assigned hart VCPU pointers before booting the secondary cores.
+    for hart in &crate::HARTS {
+        for (i, guest_id_opt) in hart.guests.iter().enumerate() {
+            if let Some(guest_id) = guest_id_opt {
+                let guest = &GUESTS[*guest_id];
+                let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
+                let assigned_guest_vcpus = hart.assigned_guest_vcpus.get();
+                unsafe {
+                    // First values of the vcpu_ptrs array are intended for assigned harts.
+                    (*assigned_guest_vcpus)[i] = vcpu_ptrs[0].unwrap();
+                    // Clear the assigned hart VCPU pointers from
+                    // the Guest struct to prevent other harts from using them.
+                    (*vcpu_ptrs)[0] = None;
+                    (*vcpu_ptrs).rotate_left(1);
                 }
+            } else {
+                break;
             }
         }
     }

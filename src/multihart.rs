@@ -5,12 +5,12 @@ use core::{arch::asm, cell::UnsafeCell};
 
 #[derive(Debug, Default)]
 pub struct Hart {
-    pub assigned_guests:
+    pub assigned_guest_vcpus:
         UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]>,
     pub guests: [Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
 }
 
-// The Hart struct is thread-safe if we never change assigned_guests field after waking the harts up.
+// The Hart struct is thread-safe if we never change assigned_guest_vcpus field after waking the harts up.
 unsafe impl Sync for Hart {}
 unsafe impl Send for Hart {}
 
@@ -146,7 +146,7 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
                 // Run a guest if it is free.
                 if is_free.is_ok() {
                     unsafe {
-                        let vcpu_ptr = (*hart.assigned_guests.get())[local_guest_id];
+                        let vcpu_ptr = (*hart.assigned_guest_vcpus.get())[local_guest_id];
                         (*vcpu_ptr).very_fisrt_run(hart_id, local_guest_id);
                     }
                 }
@@ -174,13 +174,13 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
 }
 
 pub fn is_hart_assigned(hart_id: usize) -> bool {
-    // Determine if a hart is assigned. The assigned_guests
+    // Determine if a hart is assigned. The assigned_guest_vcpus
     // field must contain at least one non-null element.
 
-    let assigned_guests = HARTS[hart_id].assigned_guests.get();
+    let assigned_guest_vcpus = HARTS[hart_id].assigned_guest_vcpus.get();
 
     unsafe {
-        (*assigned_guests)
+        (*assigned_guest_vcpus)
             .first()
             .filter(|ptr| !ptr.is_null())
             .is_some()

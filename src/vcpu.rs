@@ -167,16 +167,17 @@ impl Vcpu {
                 if hart.guests.len() <= guest_id {
                     guest_id = 0;
                 }
-                if crate::guest::claim_assigned_hart_slot_if_available(
-                    hart.guests[guest_id].unwrap(),
-                )
-                .is_ok()
-                {
-                    unsafe {
-                        vcpu_ptr = Ok((*hart.assigned_guests.get())[guest_id]);
+                if let Some(global_guest_id) = hart.guests[guest_id] {
+                    if crate::guest::claim_assigned_hart_slot_if_available(global_guest_id).is_ok()
+                    {
+                        unsafe {
+                            vcpu_ptr = Ok((*hart.assigned_guest_vcpus.get())[guest_id]);
+                        }
+                    } else {
+                        vcpu_ptr = Err(());
                     }
                 } else {
-                    vcpu_ptr = Err(());
+                    vcpu_ptr = Err(())
                 }
             } else {
                 if GUESTS.len() <= guest_id {
