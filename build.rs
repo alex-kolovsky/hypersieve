@@ -11,6 +11,8 @@ struct Guest {
     path: String,
     aligned_passthrough_mmio_regions: Vec<MemoryRegion>,
     allowed_mmio_peripherals: Vec<MmioPeripheral>,
+    vlen: usize,
+    fp: bool,
 }
 
 #[derive(Debug, Default)]
@@ -35,13 +37,13 @@ fn main() {
     // Generate vector extension support file.
     build_modules::vector_extension_support::generate_vector_extension_support(
         &out_dir,
-        hypervisor_configuration.vlen,
+        hypervisor_configuration.max_vlen,
     );
 
     // Generate floating-point extension support file.
     build_modules::floating_point_extension_support::generate_floating_point_extension_support(
         &out_dir,
-        hypervisor_configuration.floating_point_extension,
+        hypervisor_configuration.is_fp_needed,
     );
 
     // Parse the driver configuration file.

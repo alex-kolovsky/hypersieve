@@ -17,8 +17,8 @@ pub struct HypervisorConfiguration {
     pub max_allowed_mmio_peripherals_count: usize,
     pub max_aligned_passthrough_mmio_regions_count: usize,
 
-    pub vlen: usize,
-    pub floating_point_extension: bool,
+    pub max_vlen: usize,
+    pub is_fp_needed: bool,
     pub system_mmio_windows: Vec<MemoryRegion>,
 }
 
@@ -67,26 +67,18 @@ pub fn parse_dts(
     let mut max_allowed_mmio_peripherals_count: usize = 0;
     let mut max_aligned_passthrough_mmio_regions_count: usize = 0;
 
+    let mut max_vlen: usize = 0;
+
     // Total hart capacity allocated across all guest VMs.
     let mut total_hart_capacity: usize = 0;
 
-    let vlen: usize;
-    let floating_point_extension: bool;
+    let mut is_fp_needed = false;
 
     let mut system_mmio_windows: Vec<MemoryRegion> = Vec::new();
 
     let mut guests: Vec<Guest> = Vec::new();
     let fdt = fdt::Fdt::new(&dtb_data).unwrap();
     if let Some(hypervisor) = fdt.find_node("/hypervisor-config") {
-        // Extract the vector length (VLEN).
-        vlen = hypervisor
-            .property("vlen-size")
-            .expect("No vlen-size property in DTS")
-            .as_usize()
-            .unwrap();
-
-        floating_point_extension = hypervisor.property("floating-point-extension").is_some();
-
         let system_mmio_windows_raw = hypervisor
             .property("mmio-windows")
             .expect("No mmio-windows property in DTS")
@@ -122,6 +114,23 @@ pub fn parse_dts(
             let allowed_mmio_raw = guest
                 .property("allowed-mmio")
                 .expect("No allowed-mmio field in the hardware DTS");
+
+            // Extract the vector length (VLEN).
+            let vlen = guest
+                .property("vlen")
+                .expect("No vlen property in DTS")
+                .as_usize()
+                .unwrap();
+
+            if vlen > max_vlen {
+                max_vlen = vlen;
+            }
+
+            let fp = guest.property("floating-point-extension").is_some();
+
+            if fp {
+                is_fp_needed = true;
+            }
 
             let mut allowed_mmio: Vec<MemoryRegion> = Vec::new();
             let (chunks, _remainder) = allowed_mmio_raw.value.as_chunks::<8>();
@@ -223,6 +232,8 @@ pub fn parse_dts(
                     path: String::from(path),
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
+                    vlen,
+                    fp,
                 };
 
                 guests.push(guest_entry);
@@ -234,6 +245,8 @@ pub fn parse_dts(
                     path: String::from(path),
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
+                    vlen,
+                    fp,
                 };
                 guests.push(guest_entry);
             }
@@ -266,8 +279,8 @@ pub fn parse_dts(
         max_aligned_passthrough_mmio_regions_count,
         harts,
         total_hart_capacity,
-        vlen,
-        floating_point_extension,
+        max_vlen,
+        is_fp_needed,
         system_mmio_windows,
     }
 }

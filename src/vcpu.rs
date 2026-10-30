@@ -1,8 +1,8 @@
-use crate::{GUESTS, VLEN, read_csr, registers};
+use crate::{GUESTS, MAX_VLEN, guest::get_current_guest_id, read_csr, registers};
 use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
 
 pub const TIMER_OFFSET: u64 = 10_000;
-pub type Vr = [u32; VLEN / 32];
+pub type Vr = [u32; MAX_VLEN / 32];
 
 #[repr(C)]
 #[repr(align(8))]
@@ -79,7 +79,7 @@ impl Vcpu {
             vl: 0,
 
             // Vector registers
-            vrs: [[0; VLEN / 32]; 32],
+            vrs: [[0; MAX_VLEN / 32]; 32],
 
             // Floating-point registers
             fprs: [0.0; 32],
@@ -205,14 +205,18 @@ impl Vcpu {
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
 
         unsafe {
-            restore_extension_registers(next_guest);
+            // TODO: create guest-specific switch routines.
             (*next_guest).vstimecmp = vstimecmp;
             (*next_guest).run();
         }
     }
 
     pub fn run(&mut self) -> ! {
-        restore_extension_registers(self as *mut Vcpu);
+        // Execute the guest-specific ret (return to guest) routine, such as restoring extension registers.
+        let current_guest_id = get_current_guest_id(self.host_hart_id, self.guest_id_for_hart);
+        let guest_specific_ret_routine = GUESTS[current_guest_id].guest_specific_ret_routine;
+        guest_specific_ret_routine(self as *mut Vcpu);
+
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
         }
@@ -366,17 +370,4 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
         t5_offset = const offset_of!(Vcpu, gprs) + registers::T5_OFFSET * 8,
         t6_offset = const offset_of!(Vcpu, gprs) + registers::T6_OFFSET * 8,
     );
-}
-
-fn restore_extension_registers(vcpu_ptr: *mut Vcpu) {
-    let vcpu_ref = unsafe { &(*vcpu_ptr) };
-    if (vcpu_ref.vsstatus & ((1 << 9) | (1 << 10))) != 0 {
-        // Restore vector registers.
-        crate::restore_vrs(vcpu_ptr);
-    }
-
-    if (vcpu_ref.vsstatus & ((1 << 14) | (1 << 13))) != 0 {
-        // Restore floating-point registers.
-        crate::restore_fprs(vcpu_ptr);
-    }
 }

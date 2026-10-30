@@ -5,15 +5,6 @@
     #size-cells = <2>;
 
     hypervisor-config {
-        // Size of the vector registers.
-        // To turn off the vector extension,
-        // set the vlen-size parameter to zero.
-        vlen-size = <128>;
-
-        // Enables the floating-point extension;
-        // comment out or delete this parameter to disable it.
-        floating-point-extension;
-
         // All top-level MMIO windows in the system.
         // Each window encompasses a broad peripheral cluster and the space between them.
         // The greater the number of such windows, the slower the hypervisor becomes.
@@ -25,6 +16,11 @@
         vm0 {
             // Path of the guest binary.
             path = "target/guest-1/guest-1.bin";
+
+            // Size of the vector registers.
+            // To turn off the vector extension,
+            // set the vlen-size parameter to zero.
+            vlen = <128>;
 
             // Maximum number of total Harts a guest can use, combining both assigned and shared Harts.
             hart-capacity = <2>;
@@ -49,6 +45,12 @@
 
         // Configuration for the second guest VM.
         vm1 {
+            vlen = <0>;
+
+            // Enables the floating-point extension;
+            // comment out or delete this parameter to disable it.
+            floating-point-extension;
+
             path = "target/guest-2/guest-2.bin";
 
             hart-capacity = <2>;

@@ -170,27 +170,12 @@ pub extern "C" fn trap_handler() {
 
 pub fn handle_trap(vcpu: *mut Vcpu) {
     let vcpu_ref = unsafe { &mut (*vcpu) };
-    let vsstatus = vcpu_ref.vsstatus;
 
-    // Save vector registers if vector extension turned on.
-    let vsstatus_vs = (vsstatus & (1 << 9 | 1 << 10)) >> 9;
-
-    if vsstatus_vs == 3 {
-        crate::save_vrs(vcpu);
-
-        vcpu_ref.vsstatus &= !(1 << 9 | 1 << 10);
-        vcpu_ref.vsstatus |= 2 << 9;
-    }
-
-    // Save floating-point registers if floating-point extension turned on.
-    let vsstatus_fs = (vsstatus & (1 << 13 | 1 << 14)) >> 13;
-
-    if vsstatus_fs == 3 {
-        crate::save_fprs(vcpu);
-
-        vcpu_ref.vsstatus &= !(1 << 13 | 1 << 14);
-        vcpu_ref.vsstatus |= 2 << 13;
-    }
+    // Execute the guest-specific trap routine, such as saving extension registers.
+    let current_guest_id =
+        crate::guest::get_current_guest_id(vcpu_ref.host_hart_id, vcpu_ref.guest_id_for_hart);
+    let guest_specific_trap_routine = crate::GUESTS[current_guest_id].guest_specific_trap_routine;
+    guest_specific_trap_routine(vcpu);
 
     let scause = vcpu_ref.scause;
 

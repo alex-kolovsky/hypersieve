@@ -2,6 +2,7 @@
 #![no_main]
 
 mod allocator;
+mod extension_routines;
 mod guest;
 mod guest_table;
 mod mmio;
@@ -25,6 +26,7 @@ use core::mem::offset_of;
 include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
+include!(concat!(env!("OUT_DIR"), "/guest_specific_routines.rs"));
 include!(concat!(
     env!("OUT_DIR"),
     "/floating_point_extension_support.rs"

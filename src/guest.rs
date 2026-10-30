@@ -33,6 +33,8 @@ pub struct Guest {
     pub data: &'static [u8],
     pub aligned_passthrough_mmio_regions: [MmioMemoryRegion; MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT],
     pub allowed_mmio_memory_region: [MmioMemoryRegion; MAX_ALLOWED_MMIO_REGIONS_COUNT],
+    pub guest_specific_trap_routine: fn(*mut Vcpu),
+    pub guest_specific_ret_routine: fn(*mut Vcpu),
 }
 
 // The Guest struct is thread-safe if we never change Option::None to Option::Some or vice versa after waking the harts up.

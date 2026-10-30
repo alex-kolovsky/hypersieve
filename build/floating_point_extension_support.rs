@@ -1,6 +1,6 @@
 use std::io::Write;
 
-pub fn generate_floating_point_extension_support(out_dir: &str, f: bool) {
+pub fn generate_floating_point_extension_support(out_dir: &str, is_fp_needed: bool) {
     // Create the file path for the floating-point extension support code.
     let floating_point_extension_support_file_path =
         std::path::Path::new(out_dir).join("floating_point_extension_support.rs");
@@ -8,7 +8,7 @@ pub fn generate_floating_point_extension_support(out_dir: &str, f: bool) {
         std::fs::File::create(&floating_point_extension_support_file_path).unwrap();
 
     // Skip adding floating-point support if disabled in the device tree.
-    if f {
+    if is_fp_needed {
         add_floating_point_extension_support(&mut floating_point_extension_support_file);
     } else {
         write_empty_floating_point_extension_support_file(
