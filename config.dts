@@ -38,6 +38,7 @@
             // Allowed memory-mapped I/O peripherals.
             // Elements 0-1: MMIO base address (e.g., UART base address)
             // Elements 2-3: Size (The exact accessible byte-span of the registers)
+            // Addresses must fall within the MMIO windows.
             // The greater the number of allowed MMIO regions, the slower the hypervisor becomes.
             // If the base address and the size are not Page-Aligned, accessing them will be significantly slower.
             allowed-mmio = <0x0 0x10000000 0x0 0x1 0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;

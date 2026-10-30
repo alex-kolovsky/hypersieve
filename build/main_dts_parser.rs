@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::Guest;
 use crate::Hart;
 use crate::build_modules::hardware_dts_parser::MemoryRegion;
@@ -134,8 +136,25 @@ pub fn parse_dts(
                         "Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
                     )
                 });
+                let is_in_window = system_mmio_windows
+                    .binary_search_by(|region| {
+                        if base_addr < region.base_addr {
+                            Ordering::Greater
+                        } else if base_addr > region.base_addr + region.size {
+                            Ordering::Less
+                        } else {
+                            Ordering::Equal
+                        }
+                    })
+                    .is_ok();
 
-                allowed_mmio.push(MemoryRegion { base_addr, size });
+                if is_in_window {
+                    allowed_mmio.push(MemoryRegion { base_addr, size });
+                } else {
+                    panic!(
+                        "Allowed MMIO address {base_addr:#x} falls outside of system MMIO windows"
+                    );
+                }
             }
 
             let path = guest
