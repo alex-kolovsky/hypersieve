@@ -26,7 +26,25 @@ Run this to automatically compile and run the hypervisor:
 cargo run
 ```
 
+## Modifying configurations
+
+Currently, the hypervisor includes three configuration files:
+
+* `config.dts` — Contains a description of the guests and the system.
+* `hardware.dts` — Describes the memory-mapped I/O (MMIO) devices.
+* `src/mmio/drivers.toml` — Binds drivers to those MMIO devices, if required.
+
+In addition, the hypervisor includes several test files:
+
+* `src/asm/guest-1.S` & `src/asm/guest-2.S` — Contain guest system code written in assembly language.
+* `src/mmio/print-letter-m.rs` — Contains a function for emulating an MMIO pseudo-device.
+
+All of these test scenarios are pre-configured in the aforementioned configuration files.
+Detailed instructions and rules for making custom modifications
+are specified directly within the configuration files themselves.
+
 ## License
+
 This project is licensed under either of
 
 - [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)

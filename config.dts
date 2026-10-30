@@ -1,8 +1,8 @@
 /dts-v1/;
 
 / {
-    #address-cells = <1>;
-    #size-cells = <1>;
+    #address-cells = <2>;
+    #size-cells = <2>;
 
     hypervisor-config {
         // Size of the vector registers.

@@ -7,11 +7,14 @@
 	soc {
 		uart: serial@10000000  {
             compatible = "ns16550a";
-			// Elements 0-1: MMIO base address
-			// Elements 2-3: Size
-			reg = <0x0 0x10000000 0x0 0x1000>;
+	        // Elements 0-1: MMIO base address (0x00000000_10000000)
+	        // Elements 2-3: Size (8 bytes)
+			reg = <0x0 0x10000000 0x0 0x8>;
 
 			// Memory policy; either 'passthrough' or 'emulate'.
+			// To emulate an MMIO peripheral device, you must provide a driver
+			// and link its `compatible` field to the path of the driver's
+			// entry function in the `src/mmio/drivers.toml` file.
 			memory-policy = "passthrough";
 		};
 		m: serial@FFFFFFFFDEADBEEF {
