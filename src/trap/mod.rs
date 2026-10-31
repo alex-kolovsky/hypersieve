@@ -172,9 +172,8 @@ pub fn handle_trap(vcpu: *mut Vcpu) {
     let vcpu_ref = unsafe { &mut (*vcpu) };
 
     // Execute the guest-specific trap routine, such as saving extension registers.
-    let current_guest_id =
-        crate::guest::get_current_guest_id(vcpu_ref.host_hart_id, vcpu_ref.guest_id_for_hart);
-    let guest_specific_trap_routine = crate::GUESTS[current_guest_id].guest_specific_trap_routine;
+    let guest = unsafe { &*vcpu_ref.guest };
+    let guest_specific_trap_routine = guest.guest_specific_trap_routine;
     guest_specific_trap_routine(vcpu);
 
     let scause = vcpu_ref.scause;

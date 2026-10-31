@@ -142,6 +142,10 @@ pub fn initialize_guests() {
                     // Configure hgatp to enforce the guest physical memory mapping.
                     (*vcpu).hgatp = page_table.hgatp();
 
+                    // Link the guest raw pointer to the VCPU for fast access.
+                    // Since the GUESTS array is static, the pointer is guaranteed to never dangle.
+                    (*vcpu).guest = guest as *const Guest;
+
                     // Initialize aligned MMIO addresses.
                     for region in &guest.aligned_passthrough_mmio_regions {
                         if region.base_addr != 0 {
@@ -180,19 +184,5 @@ pub fn initialize_guests() {
                 break;
             }
         }
-    }
-}
-
-#[inline(always)]
-pub fn get_current_guest_id(hart_id: usize, guest_id_for_hart: usize) -> usize {
-    // If hart is assigned, take a guest from the local array of dedicated guests.
-    if crate::multihart::is_hart_assigned(hart_id) {
-        let hart = &crate::HARTS[hart_id];
-
-        hart.guests[guest_id_for_hart].unwrap()
-
-    // If hart is not assigned, take a guest from the global guests array.
-    } else {
-        guest_id_for_hart
     }
 }

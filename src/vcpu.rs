@@ -1,4 +1,4 @@
-use crate::{GUESTS, MAX_VLEN, guest::get_current_guest_id, read_csr, registers};
+use crate::{GUESTS, MAX_VLEN, read_csr, registers};
 use core::{arch::naked_asm, default::Default, mem::offset_of, sync::atomic::Ordering};
 
 pub const TIMER_OFFSET: u64 = 10_000;
@@ -11,7 +11,9 @@ pub struct Vcpu {
     // General purpose registers
     pub gprs: [u64; 32],
 
+    // Data needed for the hypervisor.
     pub host_hart_id: usize,
+    pub guest: *const crate::Guest,
     pub guest_id_for_hart: usize,
 
     // Host registers
@@ -50,6 +52,7 @@ impl Vcpu {
     pub const fn zeroed() -> Self {
         Self {
             host_hart_id: 0,
+            guest: core::ptr::null(),
             guest_id_for_hart: 0,
 
             // General purpose registers
@@ -125,14 +128,11 @@ impl Vcpu {
         // Save these values before releasing this vcpu
         // to other harts to prevent data races.
         let host_sp = self.host_sp;
-        let guest_id_for_hart = self.guest_id_for_hart;
         let host_hart_id = self.host_hart_id;
 
-        let current_guest_id = crate::guest::get_current_guest_id(host_hart_id, guest_id_for_hart);
-        let current_guest = &crate::GUESTS[current_guest_id];
-
+        let current_guest = unsafe { &*self.guest };
         let is_assigned = crate::multihart::is_hart_assigned(host_hart_id);
-        let mut guest_id = guest_id_for_hart;
+        let mut guest_id = self.guest_id_for_hart;
 
         if is_assigned {
             // Update the global active assigned hart counter.
@@ -158,7 +158,7 @@ impl Vcpu {
         // Increment the current guest ID to start from the next guest immediately.
         guest_id += 1;
 
-        let next_guest: *mut Vcpu;
+        let next_guest_vcpu: *mut Vcpu;
 
         loop {
             let vcpu_ptr: Result<*mut Vcpu, ()>;
@@ -188,12 +188,12 @@ impl Vcpu {
 
             // Run a guest if it is free; otherwise, continue searching for a free guest.
             if let Ok(vcpu_ptr) = vcpu_ptr {
-                next_guest = vcpu_ptr;
+                next_guest_vcpu = vcpu_ptr;
                 // Fill the new vcpu with correct values for this hart.
                 unsafe {
-                    (*next_guest).guest_id_for_hart = guest_id;
-                    (*next_guest).host_hart_id = host_hart_id;
-                    (*next_guest).host_sp = host_sp;
+                    (*next_guest_vcpu).guest_id_for_hart = guest_id;
+                    (*next_guest_vcpu).host_hart_id = host_hart_id;
+                    (*next_guest_vcpu).host_sp = host_sp;
                 }
 
                 break;
@@ -205,16 +205,15 @@ impl Vcpu {
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
 
         unsafe {
-            // TODO: create guest-specific switch routines.
-            (*next_guest).vstimecmp = vstimecmp;
-            (*next_guest).run();
+            (*next_guest_vcpu).vstimecmp = vstimecmp;
+            (*next_guest_vcpu).run();
         }
     }
 
     pub fn run(&mut self) -> ! {
         // Execute the guest-specific ret (return to guest) routine, such as restoring extension registers.
-        let current_guest_id = get_current_guest_id(self.host_hart_id, self.guest_id_for_hart);
-        let guest_specific_ret_routine = GUESTS[current_guest_id].guest_specific_ret_routine;
+        let guest = unsafe { &*self.guest };
+        let guest_specific_ret_routine = guest.guest_specific_ret_routine;
         guest_specific_ret_routine(self as *mut Vcpu);
 
         unsafe {

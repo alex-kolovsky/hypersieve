@@ -20,11 +20,7 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
     // Load/Store Guest Page Fault
     let requested_guest_addr = read_csr!("stval");
 
-    let host_hart_id = vcpu_ref.host_hart_id;
-    let guest_id_for_hart = vcpu_ref.guest_id_for_hart;
-
-    let current_guest_id = crate::guest::get_current_guest_id(host_hart_id, guest_id_for_hart);
-    let current_guest = &crate::GUESTS[current_guest_id];
+    let guest = unsafe { &*vcpu_ref.guest };
 
     // If the address is in the system MMIO window, process it; otherwise, allocate a page.
     let is_mmio = crate::SYSTEM_MMIO_WINDOWS
@@ -40,14 +36,14 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
         .is_ok();
 
     if is_mmio {
-        process_mmio(vcpu_ref, requested_guest_addr, current_guest);
+        process_mmio(vcpu_ref, requested_guest_addr, guest);
     } else {
         // If the guest tried to read a non-existent page, raise the page fault.
         if exception_code == 21 {
             inject_fault(vcpu_ref, requested_guest_addr, exceptions::LOAD_PAGE_FAULT)
         }
         // Otherwise, allocate a 4KiB-sized page for the guest.
-        let locked_page_table = current_guest.page_table.lock();
+        let locked_page_table = guest.page_table.lock();
         locked_page_table.map_and_allocate(
             requested_guest_addr,
             4096,
