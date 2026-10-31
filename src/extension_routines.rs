@@ -30,3 +30,19 @@ pub fn save_fprs_if_needed(vcpu_ptr: *mut Vcpu) {
         crate::save_fprs(vcpu_ptr);
     }
 }
+
+pub fn set_fs(vcpu_ptr: *mut Vcpu, fs: u64) {
+    let vcpu_ref = unsafe { &mut (*vcpu_ptr) };
+    // Clean FS bits.
+    vcpu_ref.vsstatus &= !((1 << 14) | (1 << 13));
+    // Set FS to the given value.
+    vcpu_ref.vsstatus |= fs << 13;
+}
+
+pub fn set_vs(vcpu_ptr: *mut Vcpu, vs: u64) {
+    let vcpu_ref = unsafe { &mut (*vcpu_ptr) };
+    // Clean VS bits.
+    vcpu_ref.vsstatus &= !((1 << 9) | (1 << 10));
+    // Set VS to the given value.
+    vcpu_ref.vsstatus |= vs << 9;
+}

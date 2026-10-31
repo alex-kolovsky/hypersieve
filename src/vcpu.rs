@@ -205,6 +205,10 @@ impl Vcpu {
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
 
         unsafe {
+            let next_guest = &(*(*next_guest_vcpu).guest);
+            let guest_specific_switch_routine = next_guest.guest_specific_switch_routine;
+            guest_specific_switch_routine(next_guest_vcpu);
+
             (*next_guest_vcpu).vstimecmp = vstimecmp;
             (*next_guest_vcpu).run();
         }
