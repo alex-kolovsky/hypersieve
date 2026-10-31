@@ -71,7 +71,6 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()
     // Check if a guest is free. A guest is free if the active hart count
     // is less than the hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
-    let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
     let is_free = guest.active_hart_count.try_update(
         Ordering::SeqCst,
         Ordering::SeqCst,
@@ -86,6 +85,7 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()
     );
 
     if is_free.is_ok() {
+        let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
         // Remove the claimed vcpu pointer of a hart from the vcpu_ptrs array.
         let vcpu_ptr = vcpu_ptrs[0].unwrap();
         vcpu_ptrs[0] = None;
@@ -99,7 +99,7 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut Vcpu, ()
     }
 }
 
-pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> {
+pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> bool {
     // Check if a guest is free. A guest is free for a assigned hart if the active assigned hart count
     // is less than the assigned hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
@@ -116,7 +116,7 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> Result<(), ()> 
         },
     );
 
-    if is_free.is_ok() { Ok(()) } else { Err(()) }
+    is_free.is_ok()
 }
 
 pub fn initialize_guests() {

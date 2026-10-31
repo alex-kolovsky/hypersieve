@@ -141,10 +141,11 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
             if let Some(global_guest_id) = global_guest_id {
                 // Check if a guest is free. A guest is free if the assigned hart count
                 // is less than the active assigned hart count.
-                let is_free = crate::guest::claim_assigned_hart_slot_if_available(*global_guest_id);
+                let is_claimed =
+                    crate::guest::claim_assigned_hart_slot_if_available(*global_guest_id);
 
                 // Run a guest if it is free.
-                if is_free.is_ok() {
+                if is_claimed {
                     unsafe {
                         let vcpu_ptr = (*hart.assigned_guest_vcpus.get())[local_guest_id];
                         (*vcpu_ptr).very_fisrt_run(hart_id, local_guest_id);
