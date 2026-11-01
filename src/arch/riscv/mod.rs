@@ -1,3 +1,4 @@
+pub mod extension_routines;
 mod trap;
 
 // Export PageFaultInfo struct for the MMIO drivers.

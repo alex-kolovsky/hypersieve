@@ -3,7 +3,6 @@
 
 mod allocator;
 mod arch;
-mod extension_routines;
 mod guest;
 mod guest_table;
 mod mmio;
