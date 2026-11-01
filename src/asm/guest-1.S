@@ -38,6 +38,4 @@ second_hart:
     li a1, 0xFFFFFFFFDEADBEEF
     sw a0, 0(a1)
 
-    # sw a0, 0(a1)
-
     j second_hart

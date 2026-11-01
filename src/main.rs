@@ -2,6 +2,7 @@
 #![no_main]
 
 mod allocator;
+mod arch;
 mod extension_routines;
 mod guest;
 mod guest_table;
@@ -14,9 +15,7 @@ mod vcpu;
 
 extern crate alloc;
 
-use crate::{allocator::BUDDY_ALLOCATOR, guest::Guest, uart::UART};
-
-core::arch::global_asm!(include_str!("asm/boot.S"));
+use crate::{allocator::BUDDY_ALLOCATOR, arch::ArchCpu, guest::Guest, uart::UART};
 
 #[allow(unused_import_braces)]
 use core::arch::naked_asm;
@@ -36,9 +35,7 @@ include!(concat!(
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("panic: {}", info);
     loop {
-        unsafe {
-            core::arch::asm!("wfi");
-        }
+        crate::arch::Cpu::wait_for_interrupt();
     }
 }
 
