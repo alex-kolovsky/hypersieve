@@ -1,15 +1,13 @@
+use super::causes::exceptions;
 use crate::{
     read_csr,
-    trap::causes::exceptions,
     vcpu::{Vcpu, Vr},
 };
 use core::cmp::Ordering;
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct PageFaultInfo<'a> {
     pub vcpu_ref: &'a mut Vcpu,
-    pub htinst: u64,
     pub current_guest: &'a crate::guest::Guest,
     pub mmio_id: usize,
     pub requested_guest_addr: u64,
@@ -82,7 +80,6 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
         {
             let page_fault_info = PageFaultInfo {
                 vcpu_ref,
-                htinst,
                 current_guest,
                 mmio_id,
                 requested_guest_addr,

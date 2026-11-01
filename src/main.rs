@@ -15,7 +15,7 @@ mod vcpu;
 
 extern crate alloc;
 
-use crate::{allocator::BUDDY_ALLOCATOR, arch::ArchCpu, guest::Guest, uart::UART};
+use crate::{allocator::BUDDY_ALLOCATOR, arch::HardwareInterface, guest::Guest, uart::UART};
 
 #[allow(unused_import_braces)]
 use core::arch::naked_asm;

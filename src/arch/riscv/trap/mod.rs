@@ -1,16 +1,17 @@
-use crate::{
-    registers::{self},
-    trap::causes::{exceptions, interrupts},
-    vcpu::Vcpu,
-};
-use core::{arch::naked_asm, mem::offset_of};
-
-pub mod causes;
+mod causes;
 mod ecall;
 mod fatal_exception;
 pub mod page_fault;
 
-const SXLEN: u8 = 64;
+use crate::{registers, vcpu::Vcpu};
+use causes::exceptions;
+use causes::interrupts;
+use core::mem::offset_of;
+
+struct ExceptionInfo {
+    interrupt_bit: u64,
+    exception_code: u64,
+}
 
 #[macro_export]
 macro_rules! read_csr {
@@ -23,11 +24,13 @@ macro_rules! read_csr {
     }};
 }
 
+const SXLEN: u8 = 64;
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".stvec")]
 #[unsafe(naked)]
 pub extern "C" fn trap_handler() {
-    naked_asm!(
+    core::arch::naked_asm!(
         // Swap a0 and sscratch.
         "csrrw a0, sscratch, a0",
 
@@ -112,7 +115,7 @@ pub extern "C" fn trap_handler() {
 
         // a0 (first argument) is still the vcpu pointer here.
         "call {handle_trap}",
-        handle_trap = sym handle_trap,
+        handle_trap = sym crate::trap::handle_trap,
         // Host CSRs
         scause_offset = const offset_of!(Vcpu, scause),
         sepc_offset = const offset_of!(Vcpu, sepc),
@@ -168,55 +171,48 @@ pub extern "C" fn trap_handler() {
     );
 }
 
-pub fn handle_trap(vcpu: *mut Vcpu) {
-    let vcpu_ref = unsafe { &mut (*vcpu) };
-
-    // Execute the guest-specific trap routine, such as saving extension registers.
-    let guest = unsafe { &*vcpu_ref.guest };
-    let guest_specific_trap_routine = guest.guest_specific_trap_routine;
-    guest_specific_trap_routine(vcpu);
-
-    let scause = vcpu_ref.scause;
-
-    // Extract type of trap (exception/interrupt).
-    let interrupt_bit = scause >> (SXLEN - 1);
-    let exception_code: u64 = scause & !(1 << 63);
-
-    match interrupt_bit {
+pub fn process_exception(vcpu_ref: &mut Vcpu) {
+    let exception_info = exception_info(vcpu_ref);
+    match exception_info.interrupt_bit {
         // Synchronous exception
-        causes::EXCEPTION => match exception_code {
+        causes::EXCEPTION => match exception_info.exception_code {
             // Ecall
             exceptions::ENV_CALL_FROM_VS_MODE => ecall::handle_ecall(vcpu_ref),
 
             // Load guest-page fault or Store/AMO guest-page fault
             exceptions::LOAD_GUEST_PAGE_FAULT | exceptions::STORE_GUEST_PAGE_FAULT => {
-                page_fault::handle_load_store_page_fault(vcpu_ref, exception_code)
+                page_fault::handle_load_store_page_fault(vcpu_ref, exception_info.exception_code)
             }
 
-            _ => fatal_exception::fatal_exception(
-                exception_code,
-                interrupt_bit,
-                vcpu_ref.host_hart_id,
-            ),
+            _ => fatal_exception::fatal_exception(exception_info, vcpu_ref.host_hart_id),
         },
 
         // Asynchronous interrupt
         causes::INTERRUPT => {
-            match exception_code {
+            match exception_info.exception_code {
                 // Timer interrupt
                 interrupts::VIRTUAL_SUPERVISOR_TIMER => {
                     vcpu_ref.run_next_guest();
                 }
 
-                _ => fatal_exception::fatal_exception(
-                    exception_code,
-                    interrupt_bit,
-                    vcpu_ref.host_hart_id,
-                ),
+                _ => fatal_exception::fatal_exception(exception_info, vcpu_ref.host_hart_id),
             }
         }
 
         _ => unreachable!(),
     }
     unreachable!()
+}
+
+fn exception_info(vcpu_ref: &mut Vcpu) -> ExceptionInfo {
+    let scause = vcpu_ref.scause;
+
+    // Extract type of trap (exception/interrupt).
+    let interrupt_bit = scause >> (SXLEN - 1);
+    let exception_code: u64 = scause & !(1 << 63);
+
+    ExceptionInfo {
+        interrupt_bit,
+        exception_code,
+    }
 }

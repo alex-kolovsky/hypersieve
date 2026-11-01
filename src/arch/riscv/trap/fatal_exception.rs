@@ -1,13 +1,17 @@
+use super::ExceptionInfo;
 use crate::read_csr;
 
 #[inline(always)]
-pub fn fatal_exception(exception_code: u64, interrupt_bit: u64, hart_id: usize) -> ! {
-    let scause_str = scause_to_str(&exception_code, &interrupt_bit);
+pub fn fatal_exception(exception_info: ExceptionInfo, hart_id: usize) -> ! {
+    let scause_str = scause_to_str(
+        &exception_info.exception_code,
+        &exception_info.interrupt_bit,
+    );
     panic!(
         "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {hart_id}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}\nstval: {:#x}",
         scause_str,
-        interrupt_bit,
-        exception_code,
+        exception_info.interrupt_bit,
+        exception_info.exception_code,
         read_csr!("vsstatus"),
         read_csr!("sstatus"),
         read_csr!("sepc"),

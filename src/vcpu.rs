@@ -194,7 +194,7 @@ impl Vcpu {
             // or marking them as "Dirty" if required to load the new guest's context.
             let next_guest = &(*(*next_guest_vcpu).guest);
             let guest_specific_switch_routine = next_guest.guest_specific_switch_routine;
-            guest_specific_switch_routine(next_guest_vcpu);
+            guest_specific_switch_routine(&mut *next_guest_vcpu);
         }
 
         let vstimecmp = read_csr!("time") + TIMER_OFFSET;
@@ -213,7 +213,7 @@ impl Vcpu {
         // Execute the guest-specific ret (return to guest) routine, such as restoring extension registers.
         let guest = unsafe { &*self.guest };
         let guest_specific_ret_routine = guest.guest_specific_ret_routine;
-        guest_specific_ret_routine(self as *mut Vcpu);
+        guest_specific_ret_routine(self);
 
         unsafe {
             switch_to_guest(self as *mut Vcpu, self.vstimecmp);
