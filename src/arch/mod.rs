@@ -36,3 +36,8 @@ pub trait VcpuInterface {
         vcpu_ptr_index: usize,
     );
 }
+
+pub trait HartInterface {
+    fn start_harts(main_hart_id: usize);
+    fn hart_configure();
+}
