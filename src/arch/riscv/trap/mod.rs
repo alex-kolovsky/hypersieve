@@ -4,7 +4,7 @@ mod fatal_exception;
 pub mod page_fault;
 
 use super::registers;
-use crate::{arch::Vcpu, vcpu::run_next_guest};
+use crate::{arch::Vcpu, vcpu_functions::run_next_guest};
 use causes::exceptions;
 use causes::interrupts;
 use core::mem::offset_of;
@@ -116,7 +116,7 @@ pub extern "C" fn trap_handler() {
 
         // a0 (first argument) is still the vcpu pointer here.
         "call {handle_trap}",
-        handle_trap = sym crate::trap::handle_trap,
+        handle_trap = sym crate::handle_trap::handle_trap,
         // Host CSRs
         scause_offset = const offset_of!(Vcpu, scause),
         sepc_offset = const offset_of!(Vcpu, sepc),

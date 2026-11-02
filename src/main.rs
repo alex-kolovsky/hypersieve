@@ -4,10 +4,10 @@
 mod allocator;
 mod arch;
 mod guest;
+mod handle_trap;
 mod mmio;
 mod multihart;
-mod trap;
-mod vcpu;
+mod vcpu_functions;
 
 extern crate alloc;
 
