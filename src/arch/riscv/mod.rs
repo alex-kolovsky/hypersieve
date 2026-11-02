@@ -1,3 +1,13 @@
+use core::arch::naked_asm;
+use core::mem::offset_of;
+
+// Include architecture-sensitive files created by the build script.
+include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
+include!(concat!(
+    env!("OUT_DIR"),
+    "/floating_point_extension_support.rs"
+));
+
 pub mod extension_routines;
 mod guest_page_table;
 mod hart_functions;

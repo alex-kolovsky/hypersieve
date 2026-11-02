@@ -368,7 +368,7 @@ pub fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: Vr) {
 
 #[inline(always)]
 pub fn vector_load(size: u64, requested_guest_addr: u64) -> Vr {
-    let mut vr: Vr = [0; crate::MAX_VLEN / 32];
+    let mut vr: Vr = [0; crate::arch::riscv::MAX_VLEN / 32];
     match size {
         1 => unsafe {
             let bits = core::ptr::read_volatile(requested_guest_addr as *mut u8);

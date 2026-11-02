@@ -11,6 +11,7 @@ mod vcpu;
 
 extern crate alloc;
 
+use crate::arch::extension_routines;
 use crate::{
     allocator::BUDDY_ALLOCATOR,
     arch::uart::global_uart_init,
@@ -18,19 +19,10 @@ use crate::{
     guest::Guest,
 };
 
-#[allow(unused_import_braces)]
-use core::arch::naked_asm;
-use core::mem::offset_of;
-
 // Include files created by the build script.
 include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
 include!(concat!(env!("OUT_DIR"), "/guest_specific_routines.rs"));
-include!(concat!(
-    env!("OUT_DIR"),
-    "/floating_point_extension_support.rs"
-));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

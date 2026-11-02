@@ -4,7 +4,7 @@ use super::{
     guest_page_table::{PTE_R, PTE_W},
     registers,
 };
-use crate::{MAX_VLEN, guest::Guest, read_csr};
+use crate::{arch::riscv::MAX_VLEN, guest::Guest, read_csr};
 
 pub const TIMER_OFFSET: u64 = 10_000;
 pub type Vr = [u32; MAX_VLEN / 32];
