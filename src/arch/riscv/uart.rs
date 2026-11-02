@@ -4,6 +4,10 @@ use core::{
 };
 use spin::Mutex;
 
+pub fn global_uart_init() {
+    UART.lock().init();
+}
+
 pub const QEMU_UART_ADDR: u64 = 0x1000_0000;
 
 pub static UART: Mutex<Uart> = Mutex::new(Uart::new(QEMU_UART_ADDR));
@@ -69,7 +73,7 @@ impl Uart {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::uart::_print(format_args!($($arg)*)))
+    ($($arg:tt)*) => ($crate::arch::uart::_print(format_args!($($arg)*)))
 }
 
 #[macro_export]

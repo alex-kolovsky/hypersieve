@@ -7,16 +7,15 @@ mod guest;
 mod mmio;
 mod multihart;
 mod trap;
-mod uart;
 mod vcpu;
 
 extern crate alloc;
 
 use crate::{
     allocator::BUDDY_ALLOCATOR,
+    arch::uart::global_uart_init,
     arch::{HardwareInterface, HartFunctions, HartInterface},
     guest::Guest,
-    uart::UART,
 };
 
 #[allow(unused_import_braces)]
@@ -44,7 +43,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 pub extern "C" fn main(hart_id: usize) -> ! {
     BUDDY_ALLOCATOR.heap.lock().init();
-    UART.lock().init();
+    global_uart_init();
 
     HartFunctions::hart_configure();
 
