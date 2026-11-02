@@ -1,8 +1,8 @@
-use crate::registers;
+use crate::{arch::VcpuInterface, registers};
 use core::arch::asm;
 
 #[inline(always)]
-pub fn handle_ecall(vcpu_ref: &mut crate::vcpu::Vcpu) {
+pub fn handle_ecall(vcpu_ref: &mut crate::arch::riscv::vcpu::Vcpu) {
     // Ecall
     unsafe {
         match vcpu_ref.gprs[registers::A7_OFFSET] {

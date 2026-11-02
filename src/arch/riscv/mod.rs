@@ -1,8 +1,11 @@
 pub mod extension_routines;
 mod trap;
+mod vcpu;
 
 // Export PageFaultInfo struct for the MMIO drivers.
 pub use trap::page_fault::PageFaultInfo;
+
+pub use vcpu::Vcpu;
 
 // Export trap handling functions.
 pub use trap::process_exception;

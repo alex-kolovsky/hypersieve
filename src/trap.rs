@@ -1,4 +1,4 @@
-use crate::vcpu::Vcpu;
+use crate::arch::Vcpu;
 
 pub fn handle_trap(vcpu: *mut Vcpu) {
     let vcpu_ref = unsafe { &mut (*vcpu) };

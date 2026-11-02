@@ -3,7 +3,8 @@ mod ecall;
 mod fatal_exception;
 pub mod page_fault;
 
-use crate::{registers, vcpu::Vcpu};
+use crate::vcpu::run_next_guest;
+use crate::{arch::Vcpu, registers};
 use causes::exceptions;
 use causes::interrupts;
 use core::mem::offset_of;
@@ -171,7 +172,7 @@ pub extern "C" fn trap_handler() {
     );
 }
 
-pub fn process_exception(vcpu_ref: &mut Vcpu) {
+pub fn process_exception(vcpu_ref: &'static mut Vcpu) {
     let exception_info = exception_info(vcpu_ref);
     match exception_info.interrupt_bit {
         // Synchronous exception
@@ -192,7 +193,7 @@ pub fn process_exception(vcpu_ref: &mut Vcpu) {
             match exception_info.exception_code {
                 // Timer interrupt
                 interrupts::VIRTUAL_SUPERVISOR_TIMER => {
-                    vcpu_ref.run_next_guest();
+                    run_next_guest(vcpu_ref);
                 }
 
                 _ => fatal_exception::fatal_exception(exception_info, vcpu_ref.host_hart_id),

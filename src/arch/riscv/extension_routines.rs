@@ -1,4 +1,4 @@
-use crate::vcpu::Vcpu;
+use crate::arch::Vcpu;
 
 pub fn restore_vrs_if_needed(vcpu_ref: &mut Vcpu) {
     if (vcpu_ref.vsstatus & ((1 << 9) | (1 << 10))) != 0 {

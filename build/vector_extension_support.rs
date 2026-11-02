@@ -26,7 +26,7 @@ fn add_vector_extension_support(
 pub const MAX_VLEN: usize = {max_vlen};
 
 #[unsafe(naked)]
-extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
+extern \"C\" fn save_vrs(vcpu: *mut Vcpu) {{
     naked_asm!(
         // Store vector CSRs.
         \".option push\",
@@ -105,14 +105,14 @@ extern \"C\" fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vs1r.v v31, (t0)\",
         \".option pop\",
         \"ret\",
-        vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
-        vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
-        vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
+        vrs_offset = const offset_of!(Vcpu, vrs),
+        vtype_offset = const offset_of!(Vcpu, vtype),
+        vl_offset = const offset_of!(Vcpu, vl),
     );
 }}
 
 #[unsafe(naked)]
-extern \"C\" fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
+extern \"C\" fn restore_vrs(vcpu: *mut Vcpu) {{
     naked_asm!(
         // Load vector CSRs.
         \".option push\",
@@ -190,9 +190,9 @@ extern \"C\" fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{
         \"vl1r.v v31, (t0)\",
         \".option pop\",
         \"ret\",
-        vrs_offset = const offset_of!(crate::vcpu::Vcpu, vrs),
-        vtype_offset = const offset_of!(crate::vcpu::Vcpu, vtype),
-        vl_offset = const offset_of!(crate::vcpu::Vcpu, vl),
+        vrs_offset = const offset_of!(Vcpu, vrs),
+        vtype_offset = const offset_of!(Vcpu, vtype),
+        vl_offset = const offset_of!(Vcpu, vl),
     );
 }}"
     )
@@ -208,10 +208,10 @@ fn write_empty_vector_extension_support_file(vector_extension_support_file: &mut
 pub const VLEN: usize = 0;
 
 #[allow(unused_variables)]
-pub const fn save_vrs(vcpu: *mut crate::vcpu::Vcpu) {{}}
+pub const fn save_vrs(vcpu: *mut Vcpu) {{}}
 
 #[allow(unused_variables)]
-pub const fn restore_vrs(vcpu: *mut crate::vcpu::Vcpu) {{}}
+pub const fn restore_vrs(vcpu: *mut Vcpu) {{}}
 "
     )
     .unwrap();

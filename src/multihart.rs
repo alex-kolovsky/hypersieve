@@ -1,12 +1,13 @@
 use crate::{
-    GUESTS, HARTS, MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART, allocator::alloc_pages, read_csr,
+    GUESTS, HARTS, MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART, allocator::alloc_pages,
+    arch::VcpuInterface, read_csr,
 };
 use core::{arch::asm, cell::UnsafeCell};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Hart {
     pub assigned_guest_vcpus:
-        UnsafeCell<[*mut crate::vcpu::Vcpu; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]>,
+        UnsafeCell<[*mut dyn VcpuInterface; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]>,
     pub guests: [Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
 }
 

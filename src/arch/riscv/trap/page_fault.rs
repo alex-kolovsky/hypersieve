@@ -1,7 +1,10 @@
 use super::causes::exceptions;
 use crate::{
+    arch::{
+        VcpuInterface,
+        riscv::vcpu::{Vcpu, Vr},
+    },
     read_csr,
-    vcpu::{Vcpu, Vr},
 };
 use core::cmp::Ordering;
 
@@ -338,7 +341,7 @@ fn handle_vector_instruction(
 }
 
 #[inline(always)]
-pub fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: crate::vcpu::Vr) {
+pub fn vector_write(size: u64, requested_guest_addr: u64, value_to_store: Vr) {
     // Write the value to the requested address.
     match size {
         1 => unsafe {

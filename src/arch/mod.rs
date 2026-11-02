@@ -9,3 +9,30 @@ pub use riscv::*;
 pub trait HardwareInterface {
     fn wait_for_interrupt();
 }
+
+pub trait VcpuInterface {
+    fn host_stack_pointer(&self) -> u64;
+    fn host_hart_id(&self) -> usize;
+    fn current_guest_id_for_hart(&self) -> usize;
+    fn current_guest_ref(&self) -> &'static crate::Guest;
+    fn prepare_guest_vcpu_for_hart_switch(
+        &mut self,
+        host_sp: u64,
+        host_hart_id: usize,
+        guest_id_for_hart: usize,
+    );
+
+    fn new(guest_entry: u64, virtual_hart_id: u64) -> Self
+    where
+        Self: Sized;
+
+    fn run(&mut self) -> !;
+    fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> !;
+
+    fn initialize_vcpu(
+        &mut self,
+        page_table: crate::guest_table::GuestPageTable,
+        guest: &crate::Guest,
+        vcpu_ptr_index: usize,
+    );
+}
