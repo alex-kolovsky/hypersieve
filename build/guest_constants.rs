@@ -194,7 +194,7 @@ pub static GUESTS: [Guest; {}] = [
             guest_constants_file,
             "Guest {{
     id: {guest_id},
-    page_table: spin::Mutex::new(crate::guest_table::GuestPageTable::empty()),
+    page_table: spin::Mutex::new(crate::arch::GuestPageTable::empty()),
     entry_gpa: {},
     active_hart_count: core::sync::atomic::AtomicUsize::new(0),
     active_assigned_hart_count: core::sync::atomic::AtomicUsize::new(0),

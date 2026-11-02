@@ -31,7 +31,7 @@ pub trait VcpuInterface {
 
     fn initialize_vcpu(
         &mut self,
-        page_table: crate::guest_table::GuestPageTable,
+        page_table: crate::arch::GuestPageTable,
         guest: &crate::Guest,
         vcpu_ptr_index: usize,
     );
@@ -40,4 +40,8 @@ pub trait VcpuInterface {
 pub trait HartInterface {
     fn start_harts(main_hart_id: usize);
     fn hart_configure();
+}
+
+pub trait GuestPageTableInterface {
+    fn map_kernel(guest_entry_gpa: usize, kernel_memory: *mut u8) -> GuestPageTable;
 }

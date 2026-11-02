@@ -1,11 +1,7 @@
 use core::{arch::naked_asm, mem::offset_of};
 
-use crate::{
-    MAX_VLEN,
-    guest::Guest,
-    guest_table::{PTE_R, PTE_W},
-    read_csr, registers,
-};
+use super::guest_page_table::{PTE_R, PTE_W};
+use crate::{MAX_VLEN, guest::Guest, read_csr, registers};
 
 pub const TIMER_OFFSET: u64 = 10_000;
 pub type Vr = [u32; MAX_VLEN / 32];
@@ -198,7 +194,7 @@ impl crate::arch::VcpuInterface for Vcpu {
     }
     fn initialize_vcpu(
         &mut self,
-        page_table: crate::guest_table::GuestPageTable,
+        page_table: crate::arch::riscv::guest_page_table::GuestPageTable,
         guest: &Guest,
         vcpu_ptr_index: usize,
     ) {

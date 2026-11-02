@@ -1,3 +1,5 @@
+use crate::arch::GuestPageTableInterface;
+
 pub const PTE_R: u64 = 1 << 1;
 pub const PTE_W: u64 = 1 << 2;
 pub const PTE_X: u64 = 1 << 3;
@@ -7,6 +9,21 @@ pub const PTE_U: u64 = 1 << 4; // User
 
 pub const PPN_SHIFT: usize = 12;
 const PPN_PTE_SHIFT: usize = 10;
+
+pub struct GuestPageTableFunctions;
+
+impl GuestPageTableInterface for GuestPageTableFunctions {
+    fn map_kernel(guest_entry_gpa: usize, kernel_memory: *mut u8) -> GuestPageTable {
+        // Map the guest memory into the guest page table.
+        let table = GuestPageTable::new();
+        table.map(
+            guest_entry_gpa as u64,
+            kernel_memory as u64,
+            PTE_R | PTE_W | PTE_X,
+        );
+        table
+    }
+}
 
 #[repr(transparent)]
 #[derive(Debug)]
@@ -71,6 +88,9 @@ pub struct GuestPageTable {
 }
 
 impl GuestPageTable {
+    pub fn kernel_memory_permissions() -> u64 {
+        PTE_R | PTE_W | PTE_X
+    }
     pub fn new() -> Self {
         Self {
             table: Level3Table::alloc(),

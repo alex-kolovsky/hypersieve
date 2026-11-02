@@ -48,7 +48,7 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
         locked_page_table.map_and_allocate(
             requested_guest_addr,
             4096,
-            crate::guest_table::PTE_R | crate::guest_table::PTE_W,
+            super::super::guest_page_table::PTE_R | super::super::guest_page_table::PTE_W,
         );
         drop(locked_page_table);
 

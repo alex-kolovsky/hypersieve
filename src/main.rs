@@ -4,7 +4,6 @@
 mod allocator;
 mod arch;
 mod guest;
-mod guest_table;
 mod mmio;
 mod multihart;
 mod registers;

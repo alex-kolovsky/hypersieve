@@ -2,8 +2,7 @@ use crate::{
     GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_ALLOWED_MMIO_REGIONS_COUNT,
     MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST,
     allocator::alloc_pages,
-    arch::{Vcpu, VcpuInterface},
-    guest_table::{GuestPageTable, PTE_R, PTE_W, PTE_X},
+    arch::{GuestPageTableFunctions, GuestPageTableInterface, Vcpu, VcpuInterface},
 };
 use core::{
     cell::UnsafeCell,
@@ -22,7 +21,7 @@ pub struct MmioMemoryRegion {
 #[derive(Debug)]
 pub struct Guest {
     pub id: usize,
-    pub page_table: spin::Mutex<GuestPageTable>,
+    pub page_table: spin::Mutex<crate::arch::GuestPageTable>,
     pub entry_gpa: usize,
     pub vcpu_ptrs: spin::Mutex<[Option<*mut dyn VcpuInterface>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
@@ -48,7 +47,7 @@ pub fn allocate_guest_memory(
     guest_entry_gpa: usize,
     image: &'static [u8],
     virtual_hart_id: u64,
-) -> (Vcpu, GuestPageTable) {
+) -> (Vcpu, crate::arch::GuestPageTable) {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
     let dst = kernel_memory;
@@ -57,14 +56,7 @@ pub fn allocate_guest_memory(
         core::ptr::copy_nonoverlapping(src, dst, image.len());
     }
 
-    // Map the guest memory into the guest page table.
-    let table = GuestPageTable::new();
-    table.map(
-        guest_entry_gpa as u64,
-        kernel_memory as u64,
-        PTE_R | PTE_W | PTE_X,
-    );
-
+    let table = GuestPageTableFunctions::map_kernel(guest_entry_gpa, kernel_memory);
     (Vcpu::new(guest_entry_gpa as u64, virtual_hart_id), table)
 }
 
