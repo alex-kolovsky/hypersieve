@@ -1,6 +1,7 @@
 pub mod extension_routines;
 mod guest_page_table;
 mod hart_functions;
+mod registers;
 mod trap;
 mod vcpu;
 

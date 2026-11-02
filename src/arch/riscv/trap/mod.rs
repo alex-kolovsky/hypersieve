@@ -3,8 +3,8 @@ mod ecall;
 mod fatal_exception;
 pub mod page_fault;
 
-use crate::vcpu::run_next_guest;
-use crate::{arch::Vcpu, registers};
+use super::registers;
+use crate::{arch::Vcpu, vcpu::run_next_guest};
 use causes::exceptions;
 use causes::interrupts;
 use core::mem::offset_of;

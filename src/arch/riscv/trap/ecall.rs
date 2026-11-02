@@ -1,4 +1,5 @@
-use crate::{arch::VcpuInterface, registers};
+use super::registers;
+use crate::arch::VcpuInterface;
 use core::arch::asm;
 
 #[inline(always)]

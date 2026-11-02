@@ -1,7 +1,10 @@
 use core::{arch::naked_asm, mem::offset_of};
 
-use super::guest_page_table::{PTE_R, PTE_W};
-use crate::{MAX_VLEN, guest::Guest, read_csr, registers};
+use super::{
+    guest_page_table::{PTE_R, PTE_W},
+    registers,
+};
+use crate::{MAX_VLEN, guest::Guest, read_csr};
 
 pub const TIMER_OFFSET: u64 = 10_000;
 pub type Vr = [u32; MAX_VLEN / 32];
@@ -151,7 +154,7 @@ impl crate::arch::VcpuInterface for Vcpu {
 
         // Set the a0 register to the virtual hart ID.
         let mut gprs = [0; 32];
-        gprs[crate::registers::A0_OFFSET] = virtual_hart_id;
+        gprs[registers::A0_OFFSET] = virtual_hart_id;
 
         Self {
             hstatus,

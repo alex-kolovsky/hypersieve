@@ -6,7 +6,6 @@ mod arch;
 mod guest;
 mod mmio;
 mod multihart;
-mod registers;
 mod trap;
 mod uart;
 mod vcpu;
