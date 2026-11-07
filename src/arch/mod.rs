@@ -1,12 +1,12 @@
 // RISC-V 64
 #[cfg(target_arch = "riscv64")]
-mod riscv;
+mod riscv64;
 #[cfg(target_arch = "riscv64")]
-core::arch::global_asm!(include_str!("riscv/asm/boot.S"));
+core::arch::global_asm!(include_str!("riscv64/asm/boot.S"));
 #[cfg(target_arch = "riscv64")]
-pub use riscv::*;
+pub use riscv64::*;
 #[cfg(target_arch = "riscv64")]
-#[path = "riscv/uart.rs"]
+#[path = "riscv64/uart.rs"]
 pub mod uart;
 
 pub trait HardwareInterface {

@@ -37,7 +37,7 @@ impl TargetArch {
 fn main() {
     println!("cargo:rerun-if-changed=config.dts");
     println!("cargo:rerun-if-changed=hardware.dts");
-    println!("cargo:rerun-if-changed=arch/riscv/mmio/driver.rs");
+    println!("cargo:rerun-if-changed=arch/riscv64/mmio/driver.rs");
 
     let target_arch = TargetArch {
         name: std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(),

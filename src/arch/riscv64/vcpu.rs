@@ -4,7 +4,7 @@ use super::{
     guest_page_table::{PTE_R, PTE_W},
     registers,
 };
-use crate::{arch::riscv::MAX_VLEN, guest::Guest, read_csr};
+use crate::{arch::riscv64::MAX_VLEN, guest::Guest, read_csr};
 
 pub const TIMER_OFFSET: u64 = 10_000;
 pub type Vr = [u32; MAX_VLEN / 32];
@@ -197,7 +197,7 @@ impl crate::arch::VcpuInterface for Vcpu {
     }
     fn initialize_vcpu(
         &mut self,
-        page_table: crate::arch::riscv::guest_page_table::GuestPageTable,
+        page_table: super::guest_page_table::GuestPageTable,
         guest: &Guest,
         vcpu_ptr_index: usize,
     ) {

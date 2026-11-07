@@ -1,5 +1,5 @@
+use super::{restore_fprs, restore_vrs, save_fprs, save_vrs};
 use crate::arch::Vcpu;
-use crate::arch::riscv::{restore_fprs, restore_vrs, save_fprs, save_vrs};
 
 pub fn restore_vrs_if_needed(vcpu_ref: &mut Vcpu) {
     if (vcpu_ref.vsstatus & ((1 << 9) | (1 << 10))) != 0 {

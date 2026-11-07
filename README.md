@@ -12,7 +12,7 @@ you'll need the [clang](https://clang.org/) compiler infrastructure and [llvm-ob
 Execute this command inside the root directory of the project to build it:
 
 ```sh
-mkdir -p target/guest-{1,2} && for i in 1 2; do clang -Wall -Wextra --target=riscv64-unknown-elf -march=rv64gcv -ffreestanding -nostdlib -fuse-ld=lld -Wl,-eguest_boot -Wl,-Ttext=0x100000 -Wl,-Map=target/guest-$i/guest-$i.map src/arch/riscv/guests/guest-$i.S -o target/guest-$i/guest-$i.elf && llvm-objcopy -O binary target/guest-$i/guest-$i.elf target/guest-$i/guest-$i.bin; done
+mkdir -p target/guest-{1,2} && for i in 1 2; do clang -Wall -Wextra --target=riscv64-unknown-elf -march=rv64gcv -ffreestanding -nostdlib -fuse-ld=lld -Wl,-eguest_boot -Wl,-Ttext=0x100000 -Wl,-Map=target/guest-$i/guest-$i.map src/arch/riscv64/guests/guest-$i.S -o target/guest-$i/guest-$i.elf && llvm-objcopy -O binary target/guest-$i/guest-$i.elf target/guest-$i/guest-$i.bin; done
 ```
 
 ### Running the hypervisor
@@ -36,7 +36,7 @@ Currently, the hypervisor includes three configuration files:
 
 In addition, the hypervisor includes several test files:
 
-* `src/arch/riscv/guests/guest-1.S` & `src/arch/riscv/guests/guest-2.S` — Contain guest system code written in assembly language.
+* `src/arch/riscv64/guests/guest-1.S` & `src/arch/riscv64/guests/guest-2.S` — Contain guest system code written in assembly language.
 * `src/mmio/print-letter-m.rs` — Contains a function for emulating an MMIO pseudo-device.
 
 All of these test scenarios are pre-configured in the aforementioned configuration files.
