@@ -5,17 +5,16 @@ mod allocator;
 mod arch;
 mod guest;
 mod handle_trap;
-mod mmio;
 mod multihart;
 mod vcpu_functions;
 
 extern crate alloc;
 
-use crate::arch::extension_routines;
 use crate::{
     allocator::BUDDY_ALLOCATOR,
-    arch::uart::global_uart_init,
-    arch::{HardwareInterface, HartFunctions, HartInterface},
+    arch::{
+        HardwareInterface, HartFunctions, HartInterface, extension_routines, uart::global_uart_init,
+    },
     guest::Guest,
 };
 

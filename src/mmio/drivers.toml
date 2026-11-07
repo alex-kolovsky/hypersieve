@@ -1,3 +1,0 @@
-[mappings]
-"ns16550a"     = "crate::mmio::uart::handle_access"
-"m"            = "crate::mmio::print_letter_m::handle_access"

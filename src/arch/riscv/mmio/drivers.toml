@@ -1,0 +1,2 @@
+[mappings]
+"m"            = "crate::arch::mmio::print_letter_m::handle_access"

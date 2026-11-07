@@ -11,16 +11,16 @@ include!(concat!(
 pub mod extension_routines;
 mod guest_page_table;
 mod hart_functions;
+pub mod mmio;
 mod registers;
 mod trap;
 mod vcpu;
 
 // Export PageFaultInfo struct for the MMIO drivers.
-pub use trap::page_fault::PageFaultInfo;
-
 pub use guest_page_table::GuestPageTable;
 pub use guest_page_table::GuestPageTableFunctions;
 pub use hart_functions::HartFunctions;
+pub use trap::page_fault::PageFaultInfo;
 pub use vcpu::Vcpu;
 
 // Export trap handling functions.
