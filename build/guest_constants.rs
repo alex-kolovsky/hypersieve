@@ -1,6 +1,9 @@
-use crate::build_modules::{
-    hardware_dts_parser::{MemoryRegion, MmioPeripheral},
-    main_dts_parser::HypervisorConfiguration,
+use crate::{
+    TargetArch,
+    build_modules::{
+        hardware_dts_parser::{MemoryRegion, MmioPeripheral},
+        main_dts_parser::HypervisorConfiguration,
+    },
 };
 use std::io::Write;
 
@@ -84,6 +87,7 @@ impl MmioMemoryRegion {
 pub fn generate_guest_constants(
     out_dir: &str,
     hypervisor_configuration: &mut HypervisorConfiguration,
+    target_arch: &TargetArch,
     drivers_config: crate::build_modules::drivers::DriverConfig,
 ) {
     // Create the file path for the guest constants.
@@ -133,10 +137,10 @@ pub static GUESTS: [Guest; {}] = [
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
 
     for (guest_id, guest) in guests.iter_mut().enumerate() {
-        generate_guest_specific_routine(
+        crate::build_modules::arch::generate_guest_specific_routine(
+            target_arch,
             guest_id,
-            guest.vlen,
-            guest.fp,
+            &mut guest.target_arch_guest_features,
             &mut guest_specific_routines_file,
         );
         // Create guest.vcpus array.
@@ -223,51 +227,4 @@ pub static GUESTS: [Guest; {}] = [
     }
 
     writeln!(guest_constants_file, "];").unwrap();
-}
-
-fn generate_guest_specific_routine(
-    guest_id: usize,
-    vlen: usize,
-    fp: bool,
-    guest_specific_routines_file: &mut std::fs::File,
-) {
-    let mut trap_routine_function =
-        format!("fn guest_{guest_id}_trap_routine(vcpu_ref: &mut Vcpu) {{\n");
-    let mut ret_routine_function =
-        format!("fn guest_{guest_id}_ret_routine(vcpu_ref: &mut Vcpu) {{\n");
-    let mut switch_routine_function =
-        format!("fn guest_{guest_id}_switch_routine(vcpu_ref: &mut Vcpu) {{\n");
-
-    if vlen != 0 {
-        trap_routine_function.push_str("extension_routines::save_vrs_if_needed(vcpu_ref);\n");
-        ret_routine_function.push_str("extension_routines::restore_vrs_if_needed(vcpu_ref);\n");
-
-        // Set VS bit to dirty, so the hypervisor will restore VRs with new guest registers.
-        switch_routine_function.push_str("extension_routines::set_vs(vcpu_ref, 0b11);\n");
-    } else {
-        // Set VS bit to OFF, so the hypervisor will turn off vector registers for this hart.
-        switch_routine_function.push_str("extension_routines::set_vs(vcpu_ref, 0b00);\n");
-    }
-    if fp {
-        trap_routine_function.push_str("extension_routines::save_fprs_if_needed(vcpu_ref);\n");
-        ret_routine_function.push_str("extension_routines::restore_fprs_if_needed(vcpu_ref);\n");
-
-        // Set FS bit to dirty, so the hypervisor will restore FPRs with new guest registers.
-        switch_routine_function.push_str("extension_routines::set_fs(vcpu_ref, 0b11);\n");
-    } else {
-        // Set FS bit to OFF, so the hypervisor will turn off floating point registers for this hart.
-        switch_routine_function.push_str("extension_routines::set_fs(vcpu_ref, 0b00);\n");
-    }
-
-    trap_routine_function.push_str("}\n");
-    ret_routine_function.push_str("}\n");
-    switch_routine_function.push_str("}\n");
-
-    write!(
-        guest_specific_routines_file,
-        "{ret_routine_function}
-{trap_routine_function}
-{switch_routine_function}"
-    )
-    .unwrap();
 }

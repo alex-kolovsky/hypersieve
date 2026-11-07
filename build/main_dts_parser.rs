@@ -2,6 +2,9 @@ use std::cmp::Ordering;
 
 use crate::Guest;
 use crate::Hart;
+use crate::TargetArch;
+use crate::build_modules::arch::TargetArchFeatures;
+use crate::build_modules::arch::TargetArchGuestFeatures;
 use crate::build_modules::hardware_dts_parser::MemoryRegion;
 use crate::build_modules::hardware_dts_parser::MmioPeripheral;
 
@@ -17,8 +20,8 @@ pub struct HypervisorConfiguration {
     pub max_allowed_mmio_peripherals_count: usize,
     pub max_aligned_passthrough_mmio_regions_count: usize,
 
-    pub max_vlen: usize,
-    pub is_fp_needed: bool,
+    pub target_arch_features: TargetArchFeatures,
+
     pub system_mmio_windows: Vec<MemoryRegion>,
 }
 
@@ -48,6 +51,7 @@ pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) 
 
 pub fn parse_dts(
     out_dir: &str,
+    target_arch: &TargetArch,
     mmio_peripherals: Vec<crate::build_modules::hardware_dts_parser::MmioPeripheral>,
 ) -> HypervisorConfiguration {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
@@ -67,12 +71,10 @@ pub fn parse_dts(
     let mut max_allowed_mmio_peripherals_count: usize = 0;
     let mut max_aligned_passthrough_mmio_regions_count: usize = 0;
 
-    let mut max_vlen: usize = 0;
-
     // Total hart capacity allocated across all guest VMs.
     let mut total_hart_capacity: usize = 0;
 
-    let mut is_fp_needed = false;
+    let mut target_arch_features: TargetArchFeatures = Default::default();
 
     let mut system_mmio_windows: Vec<MemoryRegion> = Vec::new();
 
@@ -98,6 +100,7 @@ pub fn parse_dts(
         }
 
         for guest in hypervisor.children() {
+            let mut target_arch_guest_features = TargetArchGuestFeatures::default();
             // Extract the VM entry address.
             let entry_gpa = guest
                 .property("entry")
@@ -115,22 +118,12 @@ pub fn parse_dts(
                 .property("allowed-mmio")
                 .expect("No allowed-mmio field in the hardware DTS");
 
-            // Extract the vector length (VLEN).
-            let vlen = guest
-                .property("vlen")
-                .expect("No vlen property in DTS")
-                .as_usize()
-                .unwrap();
-
-            if vlen > max_vlen {
-                max_vlen = vlen;
-            }
-
-            let fp = guest.property("floating-point-extension").is_some();
-
-            if fp {
-                is_fp_needed = true;
-            }
+            crate::build_modules::arch::parse_arch_related_values_from_dts(
+                &guest,
+                &mut target_arch_guest_features,
+                target_arch,
+                &mut target_arch_features,
+            );
 
             let mut allowed_mmio: Vec<MemoryRegion> = Vec::new();
             let (chunks, _remainder) = allowed_mmio_raw.value.as_chunks::<8>();
@@ -232,8 +225,7 @@ pub fn parse_dts(
                     path: String::from(path),
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
-                    vlen,
-                    fp,
+                    target_arch_guest_features,
                 };
 
                 guests.push(guest_entry);
@@ -245,8 +237,7 @@ pub fn parse_dts(
                     path: String::from(path),
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
-                    vlen,
-                    fp,
+                    target_arch_guest_features,
                 };
                 guests.push(guest_entry);
             }
@@ -279,8 +270,7 @@ pub fn parse_dts(
         max_aligned_passthrough_mmio_regions_count,
         harts,
         total_hart_capacity,
-        max_vlen,
-        is_fp_needed,
+        target_arch_features,
         system_mmio_windows,
     }
 }

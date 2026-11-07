@@ -1,4 +1,9 @@
-use crate::build_modules::hardware_dts_parser::{MemoryRegion, MmioPeripheral};
+use crate::build_modules::{
+    arch::TargetArchGuestFeatures,
+    hardware_dts_parser::{MemoryRegion, MmioPeripheral},
+};
+
+pub static SUPPORTED_ARCHS: [&str; 1] = ["riscv64"];
 
 #[path = "build/mod.rs"]
 mod build_modules;
@@ -11,8 +16,7 @@ struct Guest {
     path: String,
     aligned_passthrough_mmio_regions: Vec<MemoryRegion>,
     allowed_mmio_peripherals: Vec<MmioPeripheral>,
-    vlen: usize,
-    fp: bool,
+    target_arch_guest_features: TargetArchGuestFeatures,
 }
 
 #[derive(Debug, Default)]
@@ -21,9 +25,27 @@ pub struct Hart {
     pub guests: Vec<Option<usize>>,
 }
 
+pub struct TargetArch {
+    name: String,
+}
+impl TargetArch {
+    pub fn is_riscv64(&self) -> bool {
+        self.name == "riscv64"
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=config.dts");
     println!("cargo:rerun-if-changed=hardware.dts");
+    println!("cargo:rerun-if-changed=arch/riscv/mmio/driver.rs");
+
+    let target_arch = TargetArch {
+        name: std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(),
+    };
+
+    if !SUPPORTED_ARCHS.contains(&target_arch.name.as_str()) {
+        panic!("{} architecture is not supported.", target_arch.name);
+    }
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
@@ -31,28 +53,26 @@ fn main() {
     let memory_peripherals = build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
 
     // Compile and parse the main device tree file.
-    let mut hypervisor_configuration =
-        build_modules::main_dts_parser::parse_dts(out_dir.as_str(), memory_peripherals);
-
-    // Generate vector extension support file.
-    build_modules::vector_extension_support::generate_vector_extension_support(
-        &out_dir,
-        hypervisor_configuration.max_vlen,
+    let mut hypervisor_configuration = build_modules::main_dts_parser::parse_dts(
+        out_dir.as_str(),
+        &target_arch,
+        memory_peripherals,
     );
 
-    // Generate floating-point extension support file.
-    build_modules::floating_point_extension_support::generate_floating_point_extension_support(
+    build_modules::arch::generate_arch_support(
         &out_dir,
-        hypervisor_configuration.is_fp_needed,
+        &target_arch,
+        &hypervisor_configuration.target_arch_features,
     );
 
     // Parse the driver configuration file.
-    let drivers_config = crate::build_modules::drivers::parse();
+    let drivers_config = crate::build_modules::drivers::parse(&target_arch);
 
     // Generate guest constants file.
     build_modules::guest_constants::generate_guest_constants(
         out_dir.as_str(),
         &mut hypervisor_configuration,
+        &target_arch,
         drivers_config,
     );
 
