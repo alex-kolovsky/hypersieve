@@ -196,7 +196,7 @@ impl crate::arch::VcpuInterface for Vcpu {
         unreachable!();
     }
     fn initialize_vcpu(
-        &mut self,
+        &'static mut self,
         page_table: super::guest_page_table::GuestPageTable,
         guest: &Guest,
         vcpu_ptr_index: usize,
@@ -220,7 +220,7 @@ impl crate::arch::VcpuInterface for Vcpu {
         // Store this VCPU pointer into the guest's VCPU pointer array (guest.vcpu_ptrs[i]).
         let mut vcpu_ptr = guest.vcpu_ptrs.lock();
 
-        (*vcpu_ptr)[vcpu_ptr_index] = Some(self as *mut Self);
+        (*vcpu_ptr)[vcpu_ptr_index] = Some(self);
     }
 }
 #[unsafe(naked)]

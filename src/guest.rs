@@ -18,12 +18,12 @@ pub struct MmioMemoryRegion {
     pub emulation_fn: Option<fn(crate::arch::PageFaultInfo)>,
 }
 
-#[derive(Debug)]
 pub struct Guest {
     pub id: usize,
     pub page_table: spin::Mutex<crate::arch::GuestPageTable>,
     pub entry_gpa: usize,
-    pub vcpu_ptrs: spin::Mutex<[Option<*mut dyn VcpuInterface>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
+    pub vcpu_ptrs:
+        spin::Mutex<[Option<&'static mut dyn VcpuInterface>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub active_hart_count: AtomicUsize,
     pub active_assigned_hart_count: AtomicUsize,
@@ -60,7 +60,7 @@ pub fn allocate_guest_memory(
     (Vcpu::new(guest_entry_gpa as u64, virtual_hart_id), table)
 }
 
-pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut dyn VcpuInterface, ()> {
+pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Option<&'static mut dyn VcpuInterface> {
     // Check if a guest is free. A guest is free if the active hart count
     // is less than the hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
@@ -80,15 +80,15 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Result<*mut dyn Vcpu
     if is_free.is_ok() {
         let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
         // Remove the claimed vcpu pointer of a hart from the vcpu_ptrs array.
-        let vcpu_ptr = vcpu_ptrs[0].unwrap();
+        let vcpu_ptr = vcpu_ptrs[0].take();
         vcpu_ptrs[0] = None;
         vcpu_ptrs.rotate_left(1);
 
         // Drop the mutex lock.
         drop(vcpu_ptrs);
-        Ok(vcpu_ptr)
+        vcpu_ptr
     } else {
-        Err(())
+        None
     }
 }
 
@@ -125,19 +125,15 @@ pub fn initialize_guests() {
             // Get the vcpu pointer by its ID.
             let cur_vcpu: *mut Option<Vcpu> = unsafe { base_ptr.add(vcpu_id) };
 
-            unsafe {
-                if let Some(vcpu_ref) = &mut *cur_vcpu {
-                    let vcpu: *mut Vcpu = vcpu_ref as *mut Vcpu;
+            if let Some(vcpu_ref) = unsafe { &mut *cur_vcpu } {
+                // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
+                let page_table;
+                (*vcpu_ref, page_table) =
+                    allocate_guest_memory(guest.entry_gpa, guest.data, vcpu_id as u64);
 
-                    // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
-                    let page_table;
-                    (*vcpu, page_table) =
-                        allocate_guest_memory(guest.entry_gpa, guest.data, vcpu_id as u64);
-
-                    (*vcpu).initialize_vcpu(page_table, guest, vcpu_id);
-                } else {
-                    unreachable!();
-                }
+                (*vcpu_ref).initialize_vcpu(page_table, guest, vcpu_id);
+            } else {
+                unreachable!();
             }
         }
     }
@@ -151,7 +147,7 @@ pub fn initialize_guests() {
                 let assigned_guest_vcpus = hart.assigned_guest_vcpus.get();
                 unsafe {
                     // First values of the vcpu_ptrs array are intended for assigned harts.
-                    (*assigned_guest_vcpus)[i] = vcpu_ptrs[0].unwrap();
+                    (*assigned_guest_vcpus)[i] = vcpu_ptrs[0].take();
                     // Clear the assigned hart VCPU pointers from
                     // the Guest struct to prevent other harts from using them.
                     (*vcpu_ptrs)[0] = None;

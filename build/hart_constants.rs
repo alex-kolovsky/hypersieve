@@ -28,11 +28,13 @@ static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
     .unwrap();
 
     for hart in harts {
+        let is_hart_assigned = !hart.guests.is_empty();
         writeln!(
             hart_constants_file ,
             "
 Hart {{
-    assigned_guest_vcpus: core::cell::UnsafeCell::new([core::ptr::null_mut::<Vcpu>() as *mut dyn VcpuInterface; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
+    is_assigned: {is_hart_assigned},
+    assigned_guest_vcpus: core::cell::UnsafeCell::new([None; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
     guests: ["
         )
         .unwrap();

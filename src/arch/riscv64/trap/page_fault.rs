@@ -8,7 +8,6 @@ use crate::{
 };
 use core::cmp::Ordering;
 
-#[derive(Debug)]
 pub struct PageFaultInfo<'a> {
     pub vcpu_ref: &'a mut Vcpu,
     pub current_guest: &'a crate::guest::Guest,

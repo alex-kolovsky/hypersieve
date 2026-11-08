@@ -33,7 +33,7 @@ pub trait VcpuInterface {
     fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> !;
 
     fn initialize_vcpu(
-        &mut self,
+        &'static mut self,
         page_table: crate::arch::GuestPageTable,
         guest: &crate::Guest,
         vcpu_ptr_index: usize,

@@ -19,9 +19,10 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
     let host_hart_id = cur_vcpu_ref.host_hart_id();
 
     let current_guest = cur_vcpu_ref.current_guest_ref();
+    let current_guest_id_for_hart = cur_vcpu_ref.current_guest_id_for_hart();
     let guest_id = current_guest.id;
 
-    let is_assigned = crate::multihart::is_hart_assigned(host_hart_id);
+    let is_assigned = crate::HARTS[host_hart_id].is_assigned;
 
     let next_guest_vcpu: *mut dyn VcpuInterface;
 
@@ -33,6 +34,13 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
             .fetch_sub(1, Ordering::Acquire);
 
         let hart = &crate::HARTS[cur_vcpu_ref.host_hart_id()];
+
+        let vcpu_ptrs = hart.assigned_guest_vcpus.get();
+
+        // Store current guest VCPU reference into the local VCPUs array to use it in later switches.
+        unsafe {
+            (*vcpu_ptrs)[current_guest_id_for_hart] = Some(cur_vcpu_ref);
+        }
 
         // Rotate the assigned guest IDs array to start from the next sequential guest.
         let mut guest_ids = hart.guests;
@@ -90,7 +98,7 @@ fn claim_guest(current_guest_id: usize) -> *mut dyn VcpuInterface {
             let vcpu_ptr_res = crate::guest::claim_vcpu_for_hart_if_available(guest_id);
 
             // If a vCPU was successfully claimed, assign it to this hart and exit the search.
-            if let Ok(vcpu_ptr) = vcpu_ptr_res {
+            if let Some(vcpu_ptr) = vcpu_ptr_res {
                 next_guest_vcpu = vcpu_ptr;
                 break 'outer;
             }
@@ -102,8 +110,8 @@ fn claim_guest(current_guest_id: usize) -> *mut dyn VcpuInterface {
 fn claim_assigned_guest(
     guest_ids: &[Option<usize>],
     hart: &crate::multihart::Hart,
-) -> (usize, *mut dyn VcpuInterface) {
-    let next_guest_vcpu: *mut dyn VcpuInterface;
+) -> (usize, &'static mut dyn VcpuInterface) {
+    let next_guest_vcpu: &'static mut dyn VcpuInterface;
     let local_guest_id: usize;
 
     // Find an available guest among all assigned to this Hart guests.
@@ -113,7 +121,7 @@ fn claim_assigned_guest(
 
             // Run a guest if it is free; otherwise, continue searching for a free guest.
             if is_claimed {
-                next_guest_vcpu = unsafe { (*hart.assigned_guest_vcpus.get())[id] };
+                next_guest_vcpu = unsafe { (*hart.assigned_guest_vcpus.get())[id].take().unwrap() };
                 local_guest_id = id;
                 break 'outer;
             } else {
