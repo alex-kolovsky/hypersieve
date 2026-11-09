@@ -16,8 +16,8 @@ panic = "abort"
 strip = true
 
 [dependencies]
-spin = "0.12.3"
-
+spin = "0.9.9"
+buddy_system_allocator = "0.9.1"
 [build-dependencies]
 fdt = "0.1.5"
 serde = { version = "1.0", default-features = false, features = ["derive"] }

@@ -15,7 +15,7 @@ Execute this command inside the root directory of the project to build it:
 ./build_guests.sh
 ```
 
-### Running the hypervisor
+### Running the Hypervisor
 
 After compiling the guest binary, you need to compile and execute the core hypervisor.
 To do this, the [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) build utility is required.
@@ -26,7 +26,7 @@ Run this to automatically compile and run the hypervisor:
 cargo run
 ```
 
-## Modifying configurations
+## Modifying Configurations
 
 Currently, the hypervisor includes three configuration files:
 

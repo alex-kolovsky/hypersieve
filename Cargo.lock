@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "buddy_system_allocator"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
+dependencies = [
+ "spin",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -24,6 +33,7 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 name = "hypersieve"
 version = "0.1.0"
 dependencies = [
+ "buddy_system_allocator",
  "fdt",
  "serde",
  "spin",
@@ -120,9 +130,9 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.12.3"
+version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0134f9043ed38b087ac4f7d4af44c79e2c9e5094421fe3164f435ce585953b10"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 dependencies = [
  "lock_api",
 ]

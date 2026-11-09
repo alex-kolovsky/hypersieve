@@ -8,10 +8,8 @@ mod handle_trap;
 mod multihart;
 mod vcpu_functions;
 
-extern crate alloc;
-
+pub extern crate alloc;
 use crate::{
-    allocator::BUDDY_ALLOCATOR,
     arch::{
         HardwareInterface, HartFunctions, HartInterface, extension_routines, uart::global_uart_init,
     },
@@ -33,8 +31,8 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main(hart_id: usize) -> ! {
-    BUDDY_ALLOCATOR.heap.lock().init();
     global_uart_init();
+    allocator::init_heap();
 
     HartFunctions::hart_configure();
 
