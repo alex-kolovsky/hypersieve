@@ -17,6 +17,7 @@ strip = true
 
 [dependencies]
 spin = "0.9.9"
+wasmi = { version = "2.0.0", default-features = false }
 buddy_system_allocator = "0.9.1"
 [build-dependencies]
 fdt = "0.1.5"
