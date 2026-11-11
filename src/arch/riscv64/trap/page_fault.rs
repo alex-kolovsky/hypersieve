@@ -4,13 +4,14 @@ use crate::{
         VcpuInterface,
         riscv64::vcpu::{Vcpu, Vr},
     },
+    guest::Guest,
     read_csr,
 };
 use core::cmp::Ordering;
 
 pub struct PageFaultInfo<'a> {
     pub vcpu_ref: &'a mut Vcpu,
-    pub current_guest: &'a crate::guest::Guest,
+    pub current_guest: &'a Guest,
     pub mmio_id: usize,
     pub requested_guest_addr: u64,
 }
@@ -58,7 +59,7 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
 }
 
 #[inline(always)]
-fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &crate::Guest) {
+fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &Guest) {
     // If this is an allowed MMIO address, perform a write to it; otherwise, throw an exception to the guest.
     let search_result = current_guest
         .allowed_mmio_memory_region
@@ -113,7 +114,7 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
 fn handle_aligned_passthrough_mmio(
     htinst: u64,
     vcpu_ref: &mut Vcpu,
-    current_guest: &crate::Guest,
+    current_guest: &Guest,
     mmio_id: usize,
     requested_guest_addr: u64,
 ) {
@@ -156,7 +157,7 @@ fn handle_aligned_passthrough_mmio(
 fn handle_scalar_instruction(
     vcpu_ref: &mut Vcpu,
     htinst: u64,
-    current_guest: &crate::Guest,
+    current_guest: &Guest,
     requested_guest_addr: u64,
     passthrough_mmio_id: usize,
 ) {
@@ -269,7 +270,7 @@ pub fn scalar_load(size: u64, requested_guest_addr: u64) -> u64 {
 fn handle_vector_instruction(
     vcpu_ref: &mut Vcpu,
     inst: u32,
-    current_guest: &crate::Guest,
+    current_guest: &Guest,
     passthrough_mmio_id: usize,
     requested_guest_addr: u64,
 ) {

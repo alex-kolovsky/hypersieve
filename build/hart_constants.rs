@@ -21,7 +21,7 @@ use crate::multihart::Hart;
 pub const MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART: usize = {max_supported_assigned_guests_per_hart};
 pub const TOTAL_HART_CAPACITY: usize = {total_hart_capacity};
 
-static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
+pub static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
 ",
     )
     .unwrap();
