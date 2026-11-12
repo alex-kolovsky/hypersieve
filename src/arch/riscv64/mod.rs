@@ -1,10 +1,12 @@
 use core::arch::naked_asm;
 use core::mem::offset_of;
 
+use hypersieve_codegen::codegen_out_dir;
+
 // Include architecture-sensitive files created by the build script.
-include!(concat!(env!("OUT_DIR"), "/vector_extension_support.rs"));
+include!(concat!(codegen_out_dir!(), "/vector_extension_support.rs"));
 include!(concat!(
-    env!("OUT_DIR"),
+    codegen_out_dir!(),
     "/floating_point_extension_support.rs"
 ));
 

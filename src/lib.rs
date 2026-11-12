@@ -2,26 +2,34 @@
 
 pub(crate) mod allocator;
 pub(crate) mod arch;
+pub mod exports;
 pub(crate) mod guest;
 pub(crate) mod handle_trap;
 pub(crate) mod multihart;
 pub(crate) mod vcpu_functions;
+pub(crate) mod wasm;
 
 extern crate alloc;
+
+// Include files created by the build script.
+include!(concat!(codegen_out_dir!(), "/guest_constants.rs"));
+include!(concat!(codegen_out_dir!(), "/hart_constants.rs"));
+include!(concat!(codegen_out_dir!(), "/guest_specific_routines.rs"));
 
 use crate::{
     arch::{HardwareInterface, HartFunctions, HartInterface, extension_routines},
     guest::Guest,
 };
-
-// Include files created by the build script.
-include!(concat!(env!("OUT_DIR"), "/guest_constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/hart_constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/guest_specific_routines.rs"));
+use hypersieve_codegen::codegen_out_dir;
 
 pub fn run(hart_id: usize) -> ! {
     arch::uart::global_uart_init();
     allocator::init_heap();
+
+    HartFunctions::hart_configure();
+    let wasm = core::include_bytes!("../test_module.wasm");
+    let engine = wasmi::Engine::default();
+    wasm::run_module(engine, wasm, "dbfas");
 
     guest::initialize_guests();
 

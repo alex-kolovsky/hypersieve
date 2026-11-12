@@ -1,0 +1,10 @@
+[package]
+name = "hypersieve-codegen"
+version = "0.1.0"
+edition = "2024"
+links = "hypersieve-codegen"
+
+[build-dependencies]
+fdt = "0.1.5"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+toml = { version = "0.8", default-features = false, features = ["parse"] }

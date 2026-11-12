@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::CONFIG_DTS_PATH;
 use crate::Guest;
 use crate::Hart;
 use crate::TargetArch;
@@ -57,7 +58,7 @@ pub fn parse_dts(
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("config.dtb");
 
     // Compile Device Tree file.
-    compile_dts(&dtb_output_path, "config.dts");
+    compile_dts(&dtb_output_path, CONFIG_DTS_PATH);
 
     // Parse Device Tree Binary file.
     let dtb_data = std::fs::read(dtb_output_path).unwrap();
@@ -159,13 +160,17 @@ pub fn parse_dts(
                 }
             }
 
-            let path = guest
-                .property("path")
-                .expect("No path field in DTS")
-                .as_str()
-                .unwrap();
+            let path = format!(
+                "{}{}",
+                crate::hypersieve_root_dir!(),
+                guest
+                    .property("path")
+                    .expect("No path field in DTS")
+                    .as_str()
+                    .unwrap()
+            );
 
-            if !std::path::Path::exists(std::path::Path::new(path)) {
+            if !std::path::Path::exists(std::path::Path::new(&path)) {
                 panic!("Guest file {path} not found");
             }
 

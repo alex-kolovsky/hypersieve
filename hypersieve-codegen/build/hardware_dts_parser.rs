@@ -42,7 +42,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("hardware.dtb");
 
     // Compile Device Tree file.
-    crate::build_modules::main_dts_parser::compile_dts(&dtb_output_path, "hardware.dts");
+    crate::build_modules::main_dts_parser::compile_dts(&dtb_output_path, "../hardware.dts");
 
     // Parse Device Tree Binary file.
     let dtb_data = std::fs::read(dtb_output_path).unwrap();

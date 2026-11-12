@@ -3,7 +3,6 @@ name = "hypersieve"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-build = "build.rs"
 
 [profile.dev]
 panic = "abort"
@@ -19,7 +18,4 @@ strip = true
 spin = "0.9.9"
 wasmi = { version = "2.0.0", default-features = false }
 buddy_system_allocator = "0.9.1"
-[build-dependencies]
-fdt = "0.1.5"
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-toml = { version = "0.8", default-features = false, features = ["parse"] }
+hypersieve-codegen = { path = "hypersieve-codegen" }
