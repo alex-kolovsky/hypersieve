@@ -40,9 +40,18 @@ name = "hypersieve"
 version = "0.1.0"
 dependencies = [
  "buddy_system_allocator",
+ "hypersieve-abi",
  "hypersieve-codegen",
  "spin",
  "wasmi",
+]
+
+[[package]]
+name = "hypersieve-abi"
+version = "0.1.0"
+dependencies = [
+ "hypersieve-codegen",
+ "spin",
 ]
 
 [[package]]

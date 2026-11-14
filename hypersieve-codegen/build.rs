@@ -78,6 +78,11 @@ macro_rules! codegen_out_dir {{
         memory_peripherals,
     );
 
+    build_modules::guest_abi_constants::generate_guest_abi_constants(
+        &out_dir,
+        &hypervisor_configuration,
+    );
+
     build_modules::arch::generate_arch_support(
         &out_dir,
         &target_arch,
@@ -89,7 +94,7 @@ macro_rules! codegen_out_dir {{
 
     // Generate guest constants file.
     build_modules::guest_constants::generate_guest_constants(
-        out_dir.as_str(),
+        &out_dir,
         &mut hypervisor_configuration,
         &target_arch,
         drivers_config,

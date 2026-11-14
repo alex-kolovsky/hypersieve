@@ -1,16 +1,6 @@
-use crate::{GUESTS, arch::VcpuInterface};
+use crate::arch::VcpuInterface;
 use core::sync::atomic::Ordering;
-
-const GUESTS_LEN: usize = GUESTS.len();
-const GUEST_INDEXES: [usize; GUESTS_LEN] = {
-    let mut guest_indexes = [0; GUESTS_LEN];
-    let mut i = 0;
-    while i != GUESTS_LEN {
-        guest_indexes[i] = i;
-        i += 1;
-    }
-    guest_indexes
-};
+use hypersieve_abi::GUEST_INDEXES;
 
 pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
     // Save these values before releasing this vcpu
@@ -20,7 +10,7 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
 
     let current_guest = cur_vcpu_ref.current_guest_ref();
     let current_guest_id_for_hart = cur_vcpu_ref.current_guest_id_for_hart();
-    let guest_id = current_guest.id;
+    let guest_id = current_guest.info.id;
 
     let is_assigned = crate::HARTS[host_hart_id].is_assigned;
 
@@ -30,6 +20,7 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
         // Decrement the global counter of active harts for this guest,
         // allowing another waiting hart to claim and run it.
         current_guest
+            .info
             .active_assigned_hart_count
             .fetch_sub(1, Ordering::Acquire);
 
@@ -65,7 +56,8 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
         drop(vcpu_ptrs);
 
         // Update the global active hart counter.
-        GUESTS[guest_id]
+        current_guest
+            .info
             .active_hart_count
             .fetch_sub(1, Ordering::Acquire);
         // Rotate array of guest IDs to start from the next guest.

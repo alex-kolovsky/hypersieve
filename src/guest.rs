@@ -1,13 +1,12 @@
+use hypersieve_abi::GuestInfo;
+
 use crate::{
     GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_ALLOWED_MMIO_REGIONS_COUNT,
-    MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST,
+    MAX_SUPPORTED_HARTS_PER_GUEST,
     allocator::alloc_pages,
     arch::{GuestPageTableFunctions, GuestPageTableInterface, Vcpu, VcpuInterface},
 };
-use core::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use core::{cell::UnsafeCell, sync::atomic::Ordering};
 
 #[derive(Debug)]
 pub struct MmioMemoryRegion {
@@ -19,17 +18,12 @@ pub struct MmioMemoryRegion {
 }
 
 pub struct Guest {
-    pub id: usize,
+    pub info: GuestInfo,
     pub page_table: spin::Mutex<crate::arch::GuestPageTable>,
     pub entry_gpa: usize,
     pub vcpu_ptrs:
         spin::Mutex<[Option<&'static mut dyn VcpuInterface>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
     pub vcpus: UnsafeCell<[Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST]>,
-    pub active_hart_count: AtomicUsize,
-    pub active_assigned_hart_count: AtomicUsize,
-    pub hart_capacity: usize,
-    pub assigned_hart_capacity: usize,
-    pub assigned_harts: [Option<u32>; MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST],
     pub data: &'static [u8],
     pub aligned_passthrough_mmio_regions: [MmioMemoryRegion; MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT],
     pub allowed_mmio_memory_region: [MmioMemoryRegion; MAX_ALLOWED_MMIO_REGIONS_COUNT],
@@ -64,11 +58,11 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Option<&'static mut 
     // Check if a guest is free. A guest is free if the active hart count
     // is less than the hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
-    let is_free = guest.active_hart_count.try_update(
+    let is_free = guest.info.active_hart_count.try_update(
         Ordering::SeqCst,
         Ordering::SeqCst,
         |active_hart_count| {
-            if active_hart_count < guest.hart_capacity {
+            if active_hart_count < guest.info.hart_capacity {
                 // Increment the active harts counter.
                 Some(active_hart_count + 1)
             } else {
@@ -96,11 +90,11 @@ pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> bool {
     // Check if a guest is free. A guest is free for a assigned hart if the active assigned hart count
     // is less than the assigned hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
-    let is_free = guest.active_assigned_hart_count.try_update(
+    let is_free = guest.info.active_assigned_hart_count.try_update(
         Ordering::SeqCst,
         Ordering::SeqCst,
         |active_assigned_hart_count| {
-            if active_assigned_hart_count < guest.assigned_hart_capacity {
+            if active_assigned_hart_count < guest.info.assigned_hart_capacity {
                 // Increment the active assigned harts counter.
                 Some(active_assigned_hart_count + 1)
             } else {
@@ -118,7 +112,7 @@ pub fn initialize_guests() {
     for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
-        for vcpu_id in 0..(guest.hart_capacity + guest.assigned_hart_capacity) {
+        for vcpu_id in 0..(guest.info.hart_capacity + guest.info.assigned_hart_capacity) {
             // Get the pointer to the first vCPU in guest.vcpus.
             let base_ptr: *mut Option<Vcpu> = vcpus as *mut Option<Vcpu>;
 
