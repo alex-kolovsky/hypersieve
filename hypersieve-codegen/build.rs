@@ -6,7 +6,7 @@ use crate::build_modules::{
 #[path = "build/mod.rs"]
 mod build_modules;
 
-pub static SUPPORTED_ARCHS: [&str; 1] = ["riscv64"];
+pub static SUPPORTED_ARCHS: [&str; 2] = ["riscv64", "wasm32"];
 
 #[macro_export]
 macro_rules! hypersieve_root_dir {
@@ -40,6 +40,9 @@ pub struct TargetArch {
 impl TargetArch {
     pub fn is_riscv64(&self) -> bool {
         self.name == "riscv64"
+    }
+    pub fn is_wasm32(&self) -> bool {
+        self.name == "wasm32"
     }
 }
 
@@ -90,26 +93,28 @@ macro_rules! codegen_out_dir {{
         hypervisor_configuration.total_hart_capacity,
     );
 
-    build_modules::arch::generate_arch_support(
-        &out_dir,
-        &target_arch,
-        &hypervisor_configuration.target_arch_features,
-    );
+    if !target_arch.is_wasm32() {
+        build_modules::arch::generate_arch_support(
+            &out_dir,
+            &target_arch,
+            &hypervisor_configuration.target_arch_features,
+        );
 
-    // Parse the driver configuration file.
-    let drivers_config = crate::build_modules::drivers::parse(&target_arch);
+        // Parse the driver configuration file.
+        let drivers_config = crate::build_modules::drivers::parse(&target_arch);
 
-    // Generate guest constants file.
-    build_modules::guest_constants::generate_guest_constants(
-        &out_dir,
-        &mut hypervisor_configuration,
-        &target_arch,
-        drivers_config,
-    );
+        // Generate guest constants file.
+        build_modules::guest_constants::generate_guest_constants(
+            &out_dir,
+            &mut hypervisor_configuration,
+            &target_arch,
+            drivers_config,
+        );
 
-    // Generate hart constants file.
-    build_modules::hart_constants::generate_hart_constants(
-        &out_dir,
-        &hypervisor_configuration.harts,
-    );
+        // Generate hart constants file.
+        build_modules::hart_constants::generate_hart_constants(
+            &out_dir,
+            &hypervisor_configuration.harts,
+        );
+    }
 }

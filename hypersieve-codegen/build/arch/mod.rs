@@ -41,6 +41,8 @@ pub fn parse_arch_related_values_from_dts(
 ) {
     if target_arch.is_riscv64() {
         riscv64::get_properties(target_arch_features, guest_node, target_arch_guest_features);
+    } else if target_arch.is_wasm32() {
+        // We don't need such properties for wasm modules.
     } else {
         unreachable!();
     }
