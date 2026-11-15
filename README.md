@@ -4,20 +4,29 @@ A bare-metal type 1 Hypervisor written from scratch in Rust
 
 ## Getting Started
 
-### Compiling a Test Guest File
+### Compiling Test Guest Files
 
-To compile the guest assembly test file,
+To compile guest assembly test files,
 you'll need the [clang](https://clang.org/) compiler infrastructure and [llvm-objcopy](https://llvm.org/docs/CommandGuide/llvm-objcopy.html) installed on your host machine.
 
-Execute this command inside the root directory of the project to build it:
+Execute this command inside the root directory of the project to build them:
 
 ```sh
 ./build_guests.sh
 ```
 
+### Building Wasm Modules
+
+Ensure you have [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) installed, then run the build script inside the `modules` directory:
+
+```sh
+cd modules
+./build_modules.sh
+```
+
 ### Running the Hypervisor
 
-After compiling the guest binary, you need to compile and execute the core hypervisor.
+After compiling guest binaries and Wasm modules, you need to compile and execute the core hypervisor.
 To do this, the [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) build utility is required.
 
 Run this to automatically compile and run the hypervisor:
