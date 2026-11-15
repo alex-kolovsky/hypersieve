@@ -56,7 +56,7 @@ impl TargetArch {
 
     pub fn get_required_modules(&self) -> Vec<String> {
         match self.name.as_str() {
-            "riscv64" => vec!["claim_guest".to_string()],
+            "riscv64" => vec![],
             _ => unreachable!(),
         }
     }

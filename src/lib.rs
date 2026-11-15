@@ -6,6 +6,7 @@ pub(crate) mod guest;
 pub(crate) mod handle_trap;
 pub(crate) mod multihart;
 pub(crate) mod vcpu_functions;
+pub(crate) mod wasm;
 
 extern crate alloc;
 
@@ -13,6 +14,7 @@ extern crate alloc;
 include!(concat!(codegen_out_dir!(), "/guest_constants.rs"));
 include!(concat!(codegen_out_dir!(), "/hart_constants.rs"));
 include!(concat!(codegen_out_dir!(), "/guest_specific_routines.rs"));
+include!(concat!(codegen_out_dir!(), "/module_mappings.rs"));
 
 use crate::{
     arch::{HardwareInterface, HartFunctions, HartInterface, extension_routines},
