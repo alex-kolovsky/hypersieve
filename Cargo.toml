@@ -1,8 +1,18 @@
 [package]
 name = "hypersieve"
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[workspace]
+members = ["hypersieve-abi", "hypersieve-codegen"]
+
+[workspace.package]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/alex-kolovsky/hypersieve"
 version = "0.1.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
 
 [profile.dev]
 panic = "abort"

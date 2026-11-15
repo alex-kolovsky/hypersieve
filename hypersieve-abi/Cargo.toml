@@ -1,7 +1,9 @@
 [package]
 name = "hypersieve-abi"
-version = "0.1.0"
-edition = "2024"
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 spin = "0.9.9"

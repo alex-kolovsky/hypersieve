@@ -23,7 +23,7 @@ To do this, the [Cargo](https://doc.rust-lang.org/cargo/getting-started/installa
 Run this to automatically compile and run the hypervisor:
 
 ```sh
-cargo run
+cargo run --release
 ```
 
 ## Modifying Configurations
@@ -32,12 +32,12 @@ Currently, the hypervisor includes three configuration files:
 
 * `config.dts` — Contains a description of the guests and the system.
 * `hardware.dts` — Describes the memory-mapped I/O (MMIO) devices.
-* `src/mmio/drivers.toml` — Binds drivers to those MMIO devices, if required.
+* `src/arch/riscv64/mmio/drivers.toml` — Binds drivers to those MMIO devices, if required.
 
 In addition, the hypervisor includes several test files:
 
 * `src/arch/riscv64/guests/guest-1.S` & `src/arch/riscv64/guests/guest-2.S` — Contain guest system code written in assembly language.
-* `src/mmio/print-letter-m.rs` — Contains a function for emulating an MMIO pseudo-device.
+* `src/arch/riscv64/mmio/print_letter_m.rs` — Contains a function for emulating an MMIO pseudo-device.
 
 All of these test scenarios are pre-configured in the aforementioned configuration files.
 Detailed instructions and rules for making custom modifications
