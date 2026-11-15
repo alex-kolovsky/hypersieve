@@ -35,7 +35,7 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
             relative_path.as_str()
         );
         let str = format!(
-            "pub static {}_MODULE: &[u8] = include_bytes!(\"{absolute_path}\");",
+            "pub static {}_MODULE_WASM: &[u8] = include_bytes!(\"{absolute_path}\");",
             module_name.to_uppercase()
         );
         writeln!(module_mappings_file, "{str}").unwrap();

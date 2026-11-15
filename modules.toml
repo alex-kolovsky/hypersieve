@@ -1,2 +1,3 @@
 [mappings]
 claim_guest = "modules/claim_guest/target/wasm32-unknown-unknown/release/claim_guest.wasm"
+claim_assigned_guest = "modules/claim_assigned_guest/target/wasm32-unknown-unknown/release/claim_assigned_guest.wasm"

@@ -31,18 +31,31 @@ impl<T> WasmModule<T> {
 }
 
 pub static ENGINE: spin::Once<Engine> = spin::Once::new();
-pub static VCPU_SWITCH_MODULE: spin::Once<WasmModule<u32>> = spin::Once::new();
+pub static CLAIM_GUEST_MODULE: spin::Once<WasmModule<u32>> = spin::Once::new();
+pub static CLAIM_ASSIGNED_GUEST_MODULE: spin::Once<WasmModule<u32>> = spin::Once::new();
 
 pub fn init_engine() {
     ENGINE.call_once(Engine::default);
 }
 
 pub fn init_wasm_modules() {
-    VCPU_SWITCH_MODULE
-        .call_once(|| WasmModule::new(crate::CLAIM_GUEST_MODULE, 0u32, init_vcpu_functions));
+    CLAIM_GUEST_MODULE.call_once(|| {
+        WasmModule::new(
+            crate::CLAIM_GUEST_MODULE_WASM,
+            0u32,
+            init_claim_guest_module,
+        )
+    });
+    CLAIM_ASSIGNED_GUEST_MODULE.call_once(|| {
+        WasmModule::new(
+            crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM,
+            0u32,
+            init_claim_assigned_hart_slot_if_available_module,
+        )
+    });
 }
 
-fn init_vcpu_functions(linker: &mut wasmi::Linker<u32>) {
+fn init_claim_guest_module(linker: &mut wasmi::Linker<u32>) {
     linker
         .func_wrap(
             "env",
@@ -54,20 +67,50 @@ fn init_vcpu_functions(linker: &mut wasmi::Linker<u32>) {
         .unwrap();
 }
 
+fn init_claim_assigned_hart_slot_if_available_module(linker: &mut wasmi::Linker<u32>) {
+    linker
+        .func_wrap(
+            "env",
+            "claim_assigned_hart_slot_if_available",
+            |_caller: wasmi::Caller<'_, u32>, param: u32| -> u32 {
+                crate::guest::claim_assigned_hart_slot_if_available(param as usize) as u32
+            },
+        )
+        .unwrap();
+}
+
 pub struct Modules;
 
 impl Modules {
     pub fn claim_guest(guest_id: usize) -> u32 {
         let function_name = "claim_guest";
 
-        let instance = VCPU_SWITCH_MODULE.get().unwrap().instance;
-        let mut store = VCPU_SWITCH_MODULE.get().unwrap().store.lock();
+        let instance = CLAIM_GUEST_MODULE.get().unwrap().instance;
+        let mut store = CLAIM_GUEST_MODULE.get().unwrap().store.lock();
 
         let function = instance
             .get_typed_func::<u32, u32>(&*store, function_name)
             .unwrap();
 
         let result = function.call(&mut *store, guest_id as u32).unwrap();
+
+        drop(store);
+
+        result
+    }
+    pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
+        let function_name = "claim_assigned_guest";
+
+        let instance = CLAIM_ASSIGNED_GUEST_MODULE.get().unwrap().instance;
+        let mut store = CLAIM_ASSIGNED_GUEST_MODULE.get().unwrap().store.lock();
+
+        let function = instance
+            .get_typed_func::<(u32, u32), u32>(&*store, function_name)
+            .unwrap();
+
+        let result = function
+            .call(&mut *store, (guest_id as u32, hart_id as u32))
+            .unwrap();
 
         drop(store);
 
