@@ -133,6 +133,8 @@ pub static GUESTS: [Guest; {}] = [
     )
     .unwrap();
 
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+
     for (guest_id, guest) in guests.iter_mut().enumerate() {
         crate::build_modules::arch::generate_guest_specific_routine(
             target_arch,
@@ -203,7 +205,7 @@ pub static GUESTS: [Guest; {}] = [
     }},
     page_table: spin::Mutex::new(crate::arch::GuestPageTable::empty()),
     entry_gpa: {},
-    data: include_bytes!(\"{}\"),
+    data: include_bytes!(\"{manifest_dir}/{}\"),
     vcpus: core::cell::UnsafeCell::new({vcpus}),
     vcpu_ptrs: spin::Mutex::new([const {{ None }}; MAX_SUPPORTED_HARTS_PER_GUEST]),
     aligned_passthrough_mmio_regions: {:#?},

@@ -162,7 +162,7 @@ pub fn parse_dts(
 
             let path = format!(
                 "{}{}",
-                env!("WORKSPACE_DIR"),
+                crate::root_dir!(),
                 guest
                     .property("path")
                     .expect("No path field in DTS")

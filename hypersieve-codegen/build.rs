@@ -8,9 +8,23 @@ mod build_modules;
 
 pub static SUPPORTED_ARCHS: [&str; 2] = ["riscv64", "wasm32"];
 
-pub const CONFIG_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "config.dts");
-pub const HARDWARE_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "hardware.dts");
-pub const MODULES_TOML_PATH: &str = concat!(env!("WORKSPACE_DIR"), "modules.toml");
+#[macro_export]
+macro_rules! root_dir {
+    () => {
+        "../"
+    };
+}
+
+#[macro_export]
+macro_rules! root_dir_from_out_relative {
+    () => {
+        "../../../../../../"
+    };
+}
+
+pub const CONFIG_DTS_PATH: &str = concat!(root_dir!(), "config.dts");
+pub const HARDWARE_DTS_PATH: &str = concat!(root_dir!(), "hardware.dts");
+pub const MODULES_TOML_PATH: &str = concat!(root_dir!(), "modules.toml");
 
 #[derive(Debug)]
 struct Guest {

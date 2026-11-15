@@ -73,7 +73,7 @@ pub fn generate_arch_support(
 pub fn get_driver_config(target_arch: &TargetArch) -> String {
     if target_arch.is_riscv64() {
         std::fs::read_to_string(concat!(
-            env!("WORKSPACE_DIR"),
+            crate::root_dir!(),
             "src/arch/riscv64/mmio/drivers.toml"
         ))
         .unwrap()

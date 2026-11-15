@@ -29,7 +29,11 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
 
     // Generate static variables containing module data.
     for (module_name, relative_path) in module_config.mappings {
-        let absolute_path = env!("WORKSPACE_DIR").to_string() + relative_path.as_str();
+        let absolute_path = format!(
+            "{}{}",
+            crate::root_dir_from_out_relative!(),
+            relative_path.as_str()
+        );
         let str = format!(
             "pub static {}_MODULE: &[u8] = include_bytes!(\"{absolute_path}\");",
             module_name.to_uppercase()
