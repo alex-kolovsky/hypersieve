@@ -205,7 +205,7 @@ pub static GUESTS: [Guest; {}] = [
     }},
     page_table: spin::Mutex::new(crate::arch::GuestPageTable::empty()),
     entry_gpa: {},
-    data: include_bytes!(\"{manifest_dir}/{}\"),
+    data: include_bytes!(\"{}\"),
     vcpus: core::cell::UnsafeCell::new({vcpus}),
     vcpu_ptrs: spin::Mutex::new([const {{ None }}; MAX_SUPPORTED_HARTS_PER_GUEST]),
     aligned_passthrough_mmio_regions: {:#?},

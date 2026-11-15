@@ -8,3 +8,6 @@ runner = "qemu-system-riscv64 -machine virt -cpu rv64,h=true,f=true,d=true,v=tru
 
 [build]
 target = "riscv64gc-unknown-none-elf"
+
+[env]
+WORKSPACE_DIR = { value = "", relative = true }

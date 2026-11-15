@@ -8,14 +8,8 @@ mod build_modules;
 
 pub static SUPPORTED_ARCHS: [&str; 2] = ["riscv64", "wasm32"];
 
-#[macro_export]
-macro_rules! hypersieve_root_dir {
-    () => {
-        "../"
-    };
-}
-pub const CONFIG_DTS_PATH: &str = concat!(hypersieve_root_dir!(), "config.dts");
-pub const HARDWARE_DTS_PATH: &str = concat!(hypersieve_root_dir!(), "hardware.dts");
+pub const CONFIG_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "config.dts");
+pub const HARDWARE_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "hardware.dts");
 
 #[derive(Debug)]
 struct Guest {
