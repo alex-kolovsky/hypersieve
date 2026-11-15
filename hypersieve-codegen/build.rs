@@ -10,6 +10,7 @@ pub static SUPPORTED_ARCHS: [&str; 2] = ["riscv64", "wasm32"];
 
 pub const CONFIG_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "config.dts");
 pub const HARDWARE_DTS_PATH: &str = concat!(env!("WORKSPACE_DIR"), "hardware.dts");
+pub const MODULES_TOML_PATH: &str = concat!(env!("WORKSPACE_DIR"), "modules.toml");
 
 #[derive(Debug)]
 struct Guest {
@@ -37,6 +38,13 @@ impl TargetArch {
     }
     pub fn is_wasm32(&self) -> bool {
         self.name == "wasm32"
+    }
+
+    pub fn get_required_modules(&self) -> Vec<String> {
+        match self.name.as_str() {
+            "riscv64" => vec!["claim_guest".to_string()],
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -88,6 +96,8 @@ macro_rules! codegen_out_dir {{
     );
 
     if !target_arch.is_wasm32() {
+        build_modules::modules::generate_module_paths(&target_arch, &out_dir);
+
         build_modules::arch::generate_arch_support(
             &out_dir,
             &target_arch,

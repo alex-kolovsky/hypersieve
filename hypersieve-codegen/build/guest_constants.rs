@@ -133,8 +133,6 @@ pub static GUESTS: [Guest; {}] = [
     )
     .unwrap();
 
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-
     for (guest_id, guest) in guests.iter_mut().enumerate() {
         crate::build_modules::arch::generate_guest_specific_routine(
             target_arch,

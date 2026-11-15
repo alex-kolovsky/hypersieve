@@ -1,0 +1,2 @@
+[mappings]
+claim_guest = "modules/claim_guest.wasm"

@@ -6,3 +6,4 @@ pub mod hardware_dts_parser;
 pub mod hart_abi_constants;
 pub mod hart_constants;
 pub mod main_dts_parser;
+pub mod modules;
