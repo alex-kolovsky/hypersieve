@@ -83,6 +83,13 @@ macro_rules! codegen_out_dir {{
         &hypervisor_configuration,
     );
 
+    // Generate hart constants file.
+    build_modules::hart_abi_constants::generate_hart_abi_constants(
+        &out_dir,
+        &hypervisor_configuration.harts,
+        hypervisor_configuration.total_hart_capacity,
+    );
+
     build_modules::arch::generate_arch_support(
         &out_dir,
         &target_arch,
@@ -103,7 +110,6 @@ macro_rules! codegen_out_dir {{
     // Generate hart constants file.
     build_modules::hart_constants::generate_hart_constants(
         &out_dir,
-        hypervisor_configuration.harts,
-        hypervisor_configuration.total_hart_capacity,
+        &hypervisor_configuration.harts,
     );
 }

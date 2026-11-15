@@ -34,7 +34,7 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
         }
 
         // Rotate the assigned guest IDs array to start from the next sequential guest.
-        let mut guest_ids = hart.guests;
+        let mut guest_ids = *hart.guests;
         guest_ids.rotate_left(guest_id);
 
         let local_guest_id;

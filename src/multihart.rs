@@ -10,7 +10,7 @@ pub struct Hart {
     pub assigned_guest_vcpus: UnsafeCell<
         [Option<&'static mut dyn VcpuInterface>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
     >,
-    pub guests: [Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
+    pub guests: &'static [Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART],
 }
 
 // SAFETY: The Hart struct is thread-safe because we never change

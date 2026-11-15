@@ -4,6 +4,7 @@ use core::sync::atomic::AtomicUsize;
 use hypersieve_codegen::codegen_out_dir;
 
 include!(concat!(codegen_out_dir!(), "/guest_abi_constants.rs"));
+include!(concat!(codegen_out_dir!(), "/hart_abi_constants.rs"));
 
 pub const GUEST_INDEXES: [usize; GUESTS_COUNT] = {
     let mut guest_indexes = [0; GUESTS_COUNT];
