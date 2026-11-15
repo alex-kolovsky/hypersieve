@@ -170,7 +170,7 @@ pub fn parse_dts(
                     .unwrap()
             );
 
-            if !std::path::Path::exists(std::path::Path::new(&path)) {
+            if !target_arch.is_wasm32() && !std::path::Path::exists(std::path::Path::new(&path)) {
                 panic!("Guest file {path} not found");
             }
 
@@ -227,7 +227,7 @@ pub fn parse_dts(
                     entry_gpa,
                     hart_capacity,
                     assigned_harts: guest_assigned_harts,
-                    path: String::from(path),
+                    path,
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
                     target_arch_guest_features,
@@ -239,7 +239,7 @@ pub fn parse_dts(
                     entry_gpa,
                     hart_capacity,
                     assigned_harts: Vec::new(),
-                    path: String::from(path),
+                    path,
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
                     target_arch_guest_features,

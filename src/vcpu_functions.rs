@@ -1,6 +1,5 @@
-use crate::arch::VcpuInterface;
+use crate::{GUESTS, arch::VcpuInterface};
 use core::sync::atomic::Ordering;
-use hypersieve_abi::GUEST_INDEXES;
 
 pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
     // Save these values before releasing this vcpu
@@ -37,10 +36,10 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
         let mut guest_ids = *hart.guests;
         guest_ids.rotate_left(guest_id);
 
-        let local_guest_id;
-
         // Search for an available guest and claim it for this hart.
-        (local_guest_id, next_guest_vcpu) = claim_assigned_guest(&guest_ids, hart);
+        let local_guest_id: usize = claim_assigned_guest(&guest_ids);
+        let vcpu_ptrs = unsafe { &mut *hart.assigned_guest_vcpus.get() };
+        next_guest_vcpu = vcpu_ptrs[local_guest_id].take().unwrap();
         local_guest_id
     } else {
         // If a hart is not assigned, release this vcpu from the global Guest struct.
@@ -51,7 +50,6 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
                 break;
             }
         }
-
         // Drop the lock here to prevent a deadlock.
         drop(vcpu_ptrs);
 
@@ -60,8 +58,9 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
             .info
             .active_hart_count
             .fetch_sub(1, Ordering::Acquire);
-        // Rotate array of guest IDs to start from the next guest.
-        next_guest_vcpu = claim_guest(guest_id);
+
+        let new_guest = &GUESTS[crate::wasm::Modules::claim_guest(guest_id) as usize];
+        next_guest_vcpu = get_global_vcpu_ptr(new_guest);
 
         // Fill the new vcpu with correct values for this hart.
         guest_id
@@ -78,32 +77,7 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
         (*next_guest_vcpu).run();
     }
 }
-
-fn claim_guest(current_guest_id: usize) -> *mut dyn VcpuInterface {
-    let next_guest_vcpu: *mut dyn VcpuInterface;
-    let mut guest_ids = GUEST_INDEXES;
-    // Rotate the guest IDs array to start from the next sequential guest.
-    guest_ids.rotate_left(current_guest_id);
-    // Find an available guest among all guests in the system.
-    'outer: loop {
-        for guest_id in guest_ids {
-            let vcpu_ptr_res = crate::guest::claim_vcpu_for_hart_if_available(guest_id);
-
-            // If a vCPU was successfully claimed, assign it to this hart and exit the search.
-            if let Some(vcpu_ptr) = vcpu_ptr_res {
-                next_guest_vcpu = vcpu_ptr;
-                break 'outer;
-            }
-        }
-    }
-    next_guest_vcpu
-}
-
-fn claim_assigned_guest(
-    guest_ids: &[Option<usize>],
-    hart: &crate::multihart::Hart,
-) -> (usize, &'static mut dyn VcpuInterface) {
-    let next_guest_vcpu: &'static mut dyn VcpuInterface;
+fn claim_assigned_guest(guest_ids: &[Option<usize>]) -> usize {
     let local_guest_id: usize;
 
     // Find an available guest among all assigned to this Hart guests.
@@ -113,7 +87,6 @@ fn claim_assigned_guest(
 
             // Run a guest if it is free; otherwise, continue searching for a free guest.
             if is_claimed {
-                next_guest_vcpu = unsafe { (*hart.assigned_guest_vcpus.get())[id].take().unwrap() };
                 local_guest_id = id;
                 break 'outer;
             } else {
@@ -121,5 +94,14 @@ fn claim_assigned_guest(
             }
         }
     }
-    (local_guest_id, next_guest_vcpu)
+    local_guest_id
+}
+
+pub fn get_global_vcpu_ptr(guest: &crate::guest::Guest) -> &mut dyn VcpuInterface {
+    let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
+    let vcpu_ptr = vcpu_ptrs[0].take().unwrap();
+    vcpu_ptrs[0] = None;
+    vcpu_ptrs.rotate_left(1);
+    drop(vcpu_ptrs);
+    vcpu_ptr
 }

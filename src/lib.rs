@@ -28,6 +28,9 @@ pub fn run(hart_id: usize) -> ! {
 
     guest::initialize_guests();
 
+    wasm::init_engine();
+    wasm::init_wasm_modules();
+
     // Start all other harts if available.
     HartFunctions::start_harts(hart_id);
 

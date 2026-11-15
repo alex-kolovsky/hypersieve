@@ -54,7 +54,7 @@ pub fn allocate_guest_memory(
     (Vcpu::new(guest_entry_gpa as u64, virtual_hart_id), table)
 }
 
-pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Option<&'static mut dyn VcpuInterface> {
+pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> bool {
     // Check if a guest is free. A guest is free if the active hart count
     // is less than the hart capacity. These values do not include assigned harts
     let guest = &GUESTS[guest_id];
@@ -71,19 +71,7 @@ pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> Option<&'static mut 
         },
     );
 
-    if is_free.is_ok() {
-        let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
-        // Remove the claimed vcpu pointer of a hart from the vcpu_ptrs array.
-        let vcpu_ptr = vcpu_ptrs[0].take();
-        vcpu_ptrs[0] = None;
-        vcpu_ptrs.rotate_left(1);
-
-        // Drop the mutex lock.
-        drop(vcpu_ptrs);
-        vcpu_ptr
-    } else {
-        None
-    }
+    is_free.is_ok()
 }
 
 pub fn claim_assigned_hart_slot_if_available(guest_id: usize) -> bool {
