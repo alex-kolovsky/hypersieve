@@ -27,7 +27,6 @@ cd modules
 ### Running the Hypervisor
 
 After compiling guest binaries and Wasm modules, you need to compile and execute the core hypervisor.
-To do this, the [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) build utility is required.
 
 Run this to automatically compile and run the hypervisor:
 
