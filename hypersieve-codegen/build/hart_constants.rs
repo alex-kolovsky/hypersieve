@@ -33,7 +33,7 @@ pub static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
             "
 Hart {{
     is_assigned: {is_hart_assigned},
-    assigned_guest_vcpus: core::cell::UnsafeCell::new([None; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
+    assigned_guest_vcpus: core::cell::UnsafeCell::new([const {{None}}; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]),
     guests: &ASSIGNED_GUESTS_BY_HART_ID[{}],
 }},
         ",

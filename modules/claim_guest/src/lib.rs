@@ -1,4 +1,4 @@
-#![no_main]
+#![no_std]
 
 #[link(wasm_import_module = "env")]
 unsafe extern "C" {
@@ -6,23 +6,32 @@ unsafe extern "C" {
 }
 use hypersieve_abi::GUEST_INDEXES;
 
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    unreachable!();
+}
+
 #[unsafe(no_mangle)]
 pub fn claim_guest(current_guest_id: usize) -> usize {
-    let mut guest_ids = GUEST_INDEXES;
-    let id: usize;
+    let guest_ids = GUEST_INDEXES;
+    let len = guest_ids.len();
+
     // Rotate the guest IDs array to start from the next sequential guest.
-    guest_ids.rotate_left(current_guest_id);
-    // Find an available guest among all guests in the system.
-    'outer: loop {
-        for guest_id in guest_ids {
+    let next_guest_id = if current_guest_id == len {
+        0
+    } else {
+        current_guest_id + 1
+    };
+
+    // Find an available guest among all assigned to this Hart guests.
+    loop {
+        for guest_id in (next_guest_id..len).chain(0..next_guest_id) {
             let is_claimed = claim_vcpu_for_hart_if_available(guest_id);
 
             // If a vCPU was successfully claimed, assign it to this hart and exit the search.
             if is_claimed {
-                id = guest_id;
-                break 'outer;
+                return guest_id;
             }
         }
     }
-    id
 }
