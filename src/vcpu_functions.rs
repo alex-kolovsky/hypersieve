@@ -11,7 +11,8 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
     let current_guest_id_for_hart = cur_vcpu_ref.current_guest_id_for_hart();
     let guest_id = current_guest.info.id;
 
-    let is_assigned = crate::HARTS[host_hart_id].is_assigned;
+    let hart = &crate::HARTS[host_hart_id];
+    let is_assigned = hart.is_assigned;
 
     let next_guest_vcpu: *mut dyn VcpuInterface;
 
@@ -22,8 +23,6 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
             .info
             .active_assigned_hart_count
             .fetch_sub(1, Ordering::Acquire);
-
-        let hart = &crate::HARTS[cur_vcpu_ref.host_hart_id()];
 
         let vcpu_ptrs = hart.assigned_guest_vcpus.get();
 
