@@ -28,6 +28,8 @@ pub fn run(hart_id: usize) -> ! {
 
     guest::initialize_guests();
 
+    HartFunctions::hart_configure();
+
     wasm::init_engine();
     wasm::init_wasm_modules();
 

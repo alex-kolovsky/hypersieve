@@ -40,11 +40,13 @@ Currently, the hypervisor includes three configuration files:
 
 * `config.dts` — Contains a description of the guests and the system.
 * `hardware.dts` — Describes the memory-mapped I/O (MMIO) devices.
+* `modules.toml` — Binds module names to their paths.
 * `src/arch/riscv64/mmio/drivers.toml` — Binds drivers to those MMIO devices, if required.
 
 In addition, the hypervisor includes several test files:
 
 * `src/arch/riscv64/guests/guest-1.S` & `src/arch/riscv64/guests/guest-2.S` — Contain guest system code written in assembly language.
+* `modules/claim_guest` & `modules/claim_assigned_guest` — Modules that find next guest ID on the guest switch.
 * `src/arch/riscv64/mmio/print_letter_m.rs` — Contains a function for emulating an MMIO pseudo-device.
 
 All of these test scenarios are pre-configured in the aforementioned configuration files.

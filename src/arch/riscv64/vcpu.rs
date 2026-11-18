@@ -174,7 +174,7 @@ impl crate::arch::VcpuInterface for Vcpu {
         guest_specific_ret_routine(self);
 
         unsafe {
-            switch_to_guest(self as *mut Vcpu, self.vstimecmp);
+            switch_to_guest(self as *mut Vcpu);
         }
 
         unreachable!();
@@ -182,15 +182,15 @@ impl crate::arch::VcpuInterface for Vcpu {
 
     fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
         // Set guest supervisor timer compare value.
-        let time = crate::read_csr!("time");
-        let vstimecmp = time + TIMER_OFFSET;
+        let vstimecmp = crate::read_csr!("time").wrapping_add(crate::read_csr!("htimedelta"));
+        self.vstimecmp = vstimecmp;
 
         self.guest_id_for_hart = guest_id_for_hart;
         self.host_hart_id = host_hart_id;
 
         unsafe {
             // Load the hart ID into a0 on the first run.
-            switch_to_guest(self as *mut Vcpu, vstimecmp);
+            switch_to_guest(self as *mut Vcpu);
         }
 
         unreachable!();
@@ -224,7 +224,7 @@ impl crate::arch::VcpuInterface for Vcpu {
     }
 }
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
+pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu) {
     naked_asm!(
         "mv t0, a0",
 
@@ -258,13 +258,14 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
         "ld t1, {vstval_offset}(t0)",
         "csrw vstval, t1",
 
+        "ld t1, {vstimecmp_offset}(t0)",
+        "csrw vstimecmp, t1",
+
         "ld t1, {vsie_offset}(t0)",
         "csrw vsie, t1",
 
         "ld t1, {vsatp_offset}(t0)",
         "csrw vsatp, t1",
-
-        "csrw vstimecmp, a1",
 
         "csrw sscratch, t0",
 
@@ -317,6 +318,7 @@ pub unsafe extern "C" fn switch_to_guest(vcpu: *mut Vcpu, vstimecmp_val: u64) {
         vsepc_offset = const offset_of!(Vcpu, vsepc),
         vscause_offset = const offset_of!(Vcpu, vscause),
         vstval_offset = const offset_of!(Vcpu, vstval),
+        vstimecmp_offset = const offset_of!(Vcpu, vstimecmp),
         vsie_offset = const offset_of!(Vcpu, vsie),
         vsatp_offset = const offset_of!(Vcpu, vsatp),
 
