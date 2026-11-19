@@ -50,9 +50,13 @@ pub fn init_wasm_modules() {
         WasmModule::new(
             crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM,
             0u32,
-            init_claim_assigned_hart_slot_if_available_module,
+            init_claim_assigned_guest_module,
         )
     });
+}
+
+fn process_panic(module_name: &str) -> ! {
+    panic!("Moudle \"{module_name}\" panicked");
 }
 
 fn init_claim_guest_module(linker: &mut wasmi::Linker<u32>) {
@@ -60,20 +64,20 @@ fn init_claim_guest_module(linker: &mut wasmi::Linker<u32>) {
         .func_wrap(
             "env",
             "claim_vcpu_for_hart_if_available",
-            |_caller: wasmi::Caller<'_, u32>, param: u32| -> u32 {
-                crate::guest::claim_vcpu_for_hart_if_available(param as usize) as u32
+            |_caller: wasmi::Caller<'_, u32>, guest_id: u32| -> u32 {
+                crate::guest::claim_vcpu_for_hart_if_available(guest_id as usize) as u32
             },
         )
         .unwrap();
 }
 
-fn init_claim_assigned_hart_slot_if_available_module(linker: &mut wasmi::Linker<u32>) {
+fn init_claim_assigned_guest_module(linker: &mut wasmi::Linker<u32>) {
     linker
         .func_wrap(
             "env",
             "claim_assigned_hart_slot_if_available",
-            |_caller: wasmi::Caller<'_, u32>, param: u32| -> u32 {
-                crate::guest::claim_assigned_hart_slot_if_available(param as usize) as u32
+            |_caller: wasmi::Caller<'_, u32>, guest_id: u32| -> u32 {
+                crate::guest::claim_assigned_hart_slot_if_available(guest_id as usize) as u32
             },
         )
         .unwrap();
@@ -83,37 +87,41 @@ pub struct Modules;
 
 impl Modules {
     pub fn claim_guest(guest_id: usize) -> u32 {
-        let function_name = "claim_guest";
+        let module_name = "claim_guest";
 
         let instance = CLAIM_GUEST_MODULE.get().unwrap().instance;
         let mut store = CLAIM_GUEST_MODULE.get().unwrap().store.lock();
 
         let function = instance
-            .get_typed_func::<u32, u32>(&*store, function_name)
+            .get_typed_func::<u32, u32>(&*store, module_name)
             .unwrap();
 
-        let result = function.call(&mut *store, guest_id as u32).unwrap();
-
+        let result = function.call(&mut *store, guest_id as u32);
         drop(store);
 
-        result
+        if let Ok(guest_id) = result {
+            guest_id
+        } else {
+            process_panic(module_name);
+        }
     }
     pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
-        let function_name = "claim_assigned_guest";
+        let module_name = "claim_assigned_guest";
 
         let instance = CLAIM_ASSIGNED_GUEST_MODULE.get().unwrap().instance;
         let mut store = CLAIM_ASSIGNED_GUEST_MODULE.get().unwrap().store.lock();
 
         let function = instance
-            .get_typed_func::<(u32, u32), u32>(&*store, function_name)
+            .get_typed_func::<(u32, u32), u32>(&*store, module_name)
             .unwrap();
 
-        let result = function
-            .call(&mut *store, (guest_id as u32, hart_id as u32))
-            .unwrap();
-
+        let result = function.call(&mut *store, (guest_id as u32, hart_id as u32));
         drop(store);
 
-        result
+        if let Ok(local_guest_id) = result {
+            local_guest_id
+        } else {
+            process_panic(module_name);
+        }
     }
 }

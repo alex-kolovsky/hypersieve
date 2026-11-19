@@ -16,19 +16,20 @@ pub fn claim_guest(current_guest_id: usize) -> usize {
     let guest_ids = GUEST_INDEXES;
     let len = guest_ids.len();
 
-    // Rotate the guest IDs array to start from the next sequential guest.
+    // Get the ID of the sequential guest.
     let next_guest_id = if current_guest_id == len {
         0
     } else {
         current_guest_id + 1
     };
 
-    // Find an available guest among all assigned to this Hart guests.
+    // Find an available guest among all guests.
     loop {
+        // Rotate the guest IDs array to start from the next sequential guest.
         for guest_id in (next_guest_id..len).chain(0..next_guest_id) {
             let is_claimed = claim_vcpu_for_hart_if_available(guest_id);
 
-            // If a vCPU was successfully claimed, assign it to this hart and exit the search.
+            // Return ID of the guest if it is free; otherwise, continue searching for a free guest.
             if is_claimed {
                 return guest_id;
             }
