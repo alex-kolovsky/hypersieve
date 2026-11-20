@@ -11,15 +11,56 @@ where
     standard_store_value: T,
     linker: Linker<T>,
     module: Module,
+    spare_wasm_module: Option<SpareWasmModule<T>>,
 }
 
-impl<T> WasmModule<T> where T: Clone {}
+#[derive(Debug)]
+pub struct WasmModuleInfo {
+    pub data: &'static [u8],
+    pub spare_module_data: Option<&'static [u8]>,
+}
+
+#[derive(Debug)]
+pub struct SpareWasmModule<T>
+where
+    T: Clone,
+{
+    instance: Instance,
+    store: Store<T>,
+    panic_count: u8,
+    standard_store_value: T,
+    linker: Linker<T>,
+    module: Module,
+    is_switched: bool,
+}
+
+impl<T> SpareWasmModule<T>
+where
+    T: Clone,
+{
+    fn into_wasm_module(self, wasm_module: Option<SpareWasmModule<T>>) -> WasmModule<T> {
+        WasmModule {
+            instance: self.instance,
+            store: self.store,
+            panic_count: 0,
+            standard_store_value: self.standard_store_value,
+            linker: self.linker,
+            module: self.module,
+            spare_wasm_module: wasm_module,
+        }
+    }
+}
 
 impl<T> WasmModule<T>
 where
     T: Clone,
 {
-    fn new(wasm: &[u8], store_value: T, initialize_module_functions: fn(&mut Linker<T>)) -> Self {
+    fn new(
+        wasm: &[u8],
+        store_value: T,
+        spare_wasm_module_data: Option<&[u8]>,
+        initialize_module_functions: fn(&mut Linker<T>),
+    ) -> Self {
         let engine = ENGINE.get().unwrap();
         let mut store = Store::new(engine, store_value.clone());
 
@@ -32,6 +73,16 @@ where
         let instance = linker
             .instantiate_and_start(&mut store, module.as_ref().unwrap())
             .unwrap();
+
+        let spare_wasm_module = if let Some(data) = spare_wasm_module_data {
+            Some(
+                WasmModule::new(data, store_value.clone(), None, initialize_module_functions)
+                    .into_spare_wasm_module(false),
+            )
+        } else {
+            None
+        };
+
         Self {
             instance,
             store,
@@ -39,26 +90,58 @@ where
             standard_store_value: store_value,
             linker,
             module: module.unwrap(),
+            spare_wasm_module,
         }
     }
 
-    fn recover(&mut self) {
+    fn into_spare_wasm_module(self, is_switched: bool) -> SpareWasmModule<T> {
+        SpareWasmModule {
+            instance: self.instance,
+            store: self.store,
+            panic_count: 0,
+            standard_store_value: self.standard_store_value,
+            linker: self.linker,
+            module: self.module,
+            is_switched,
+        }
+    }
+    fn switch_with_spare_module(mut self) -> Self {
+        let spare_module = self.spare_wasm_module.take().unwrap();
+
+        let switched_module = self.into_spare_wasm_module(true);
+        spare_module.into_wasm_module(Some(switched_module))
+    }
+
+    fn recover(mut self) -> Self {
         match self.panic_count {
             // At the first panic of the module, simply reset its Store.
             0 => {
                 self.panic_count += 1;
 
                 self.reset_store();
+                self
             }
             // At the second - reset its Instance and Store.
             1 => {
                 self.panic_count += 1;
 
                 self.reset_instance();
+                self
             }
-            // TODO: Replace the current module with a spare one.
+            // Replace the current module with the spare one on the third fault.
             2 => {
-                panic!();
+                if let Some(spare_wasm_module) = &self.spare_wasm_module {
+                    crate::println!("\nModule panicked for the third time");
+                    if spare_wasm_module.is_switched {
+                        // If even the spare module faulted, panic.
+                        panic!("Fatal panic on the spare module");
+                    }
+
+                    self.switch_with_spare_module()
+                } else {
+                    // Panic on the third fault if module has no spare the spare one.
+                    panic!("Fatal panic on the module that doesn't have a spare module",);
+                }
             }
             _ => unreachable!(),
         }
@@ -96,16 +179,18 @@ pub fn init_engine() {
 pub fn init_wasm_modules() {
     let mut claim_assigned_guest = CLAIM_ASSIGNED_GUEST_MODULE.lock();
     *claim_assigned_guest = Some(WasmModule::new(
-        crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM,
+        crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM.data,
         0u32,
+        crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM.spare_module_data,
         init_claim_assigned_guest_module,
     ));
     drop(claim_assigned_guest);
 
     let mut claim_guest = CLAIM_GUEST_MODULE.lock();
     *claim_guest = Some(WasmModule::new(
-        crate::CLAIM_GUEST_MODULE_WASM,
+        crate::CLAIM_GUEST_MODULE_WASM.data,
         0u32,
+        crate::CLAIM_GUEST_MODULE_WASM.spare_module_data,
         init_claim_guest_module,
     ));
     drop(claim_guest);
@@ -141,24 +226,27 @@ impl Modules {
     pub fn claim_guest(guest_id: usize) -> u32 {
         let module_name = "claim_guest";
 
-        let mut module_opt = CLAIM_GUEST_MODULE.lock();
-        let module = module_opt.as_mut().unwrap();
-        let instance = module.instance;
-        let mut store = &mut module.store;
+        let mut module_lock = CLAIM_GUEST_MODULE.lock();
 
-        let function = instance
-            .get_typed_func::<u32, u32>(&store, module_name)
-            .unwrap();
-
-        let result = function.call(&mut store, guest_id as u32);
-
-        // Return the guest ID if the module did not panic; Otherwise, restore the module.
+        // Subsequent loop iterations restore the module if it will panic.
         loop {
+            let mut module: WasmModule<u32> = module_lock.take().unwrap();
+            let instance = module.instance;
+            let mut store = &mut module.store;
+
+            let function = instance
+                .get_typed_func::<u32, u32>(&store, module_name)
+                .unwrap();
+
+            let result = function.call(&mut store, guest_id as u32);
+
+            // Return the guest ID if the module did not panic; Otherwise, restore the module.
             if let Ok(guest_id) = result {
-                drop(module_opt);
+                *module_lock = Some(module);
+                drop(module_lock);
                 return guest_id;
             } else {
-                module.recover();
+                module = module.recover();
                 continue;
             }
         }
@@ -166,24 +254,27 @@ impl Modules {
     pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
         let module_name = "claim_assigned_guest";
 
-        let mut module_opt = CLAIM_ASSIGNED_GUEST_MODULE.lock();
-        let module = module_opt.as_mut().unwrap();
-        let instance = &mut module.instance;
-        let store = &mut module.store;
+        let mut module_lock = CLAIM_ASSIGNED_GUEST_MODULE.lock();
 
-        let function = instance
-            .get_typed_func::<(u32, u32), u32>(&*store, module_name)
-            .unwrap();
-
-        let result = function.call(&mut *store, (guest_id as u32, hart_id as u32));
-
-        // Return the local guest ID if the module did not panic; Otherwise, restore the module.
+        // Subsequent loop iterations restore the module if it will panic.
         loop {
+            let mut module: WasmModule<u32> = module_lock.take().unwrap();
+            let instance = &mut module.instance;
+            let store = &mut module.store;
+
+            let function = instance
+                .get_typed_func::<(u32, u32), u32>(&*store, module_name)
+                .unwrap();
+
+            let result = function.call(&mut *store, (guest_id as u32, hart_id as u32));
+
+            // Return the local guest ID if the module did not panic; Otherwise, restore the module.
             if let Ok(local_guest_id) = result {
-                drop(module_opt);
+                *module_lock = Some(module);
+                drop(module_lock);
                 return local_guest_id;
             } else {
-                module.recover();
+                *module_lock = Some(module.recover());
                 continue;
             }
         }

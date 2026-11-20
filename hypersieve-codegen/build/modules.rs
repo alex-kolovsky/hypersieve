@@ -1,9 +1,15 @@
 use std::io::Write;
 
 #[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct ModuleInfo {
+    path: String,
+    spare_module_path: Option<String>,
+}
+#[derive(serde::Deserialize, Debug)]
 pub struct ModulesConfig {
     // The mappings field represents a module's name along with its path.
-    pub mappings: std::collections::HashMap<String, String>,
+    pub mappings: std::collections::HashMap<String, ModuleInfo>,
 }
 
 pub fn parse() -> ModulesConfig {
@@ -28,14 +34,28 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
     }
 
     // Generate static variables containing module data.
-    for (module_name, relative_path) in module_config.mappings {
+    for (module_name, module_info) in module_config.mappings {
         let absolute_path = format!(
             "{}{}",
             crate::root_dir_from_out_relative!(),
-            relative_path.as_str()
+            module_info.path.as_str()
         );
+
+        let spare_module_absolute_path_opt =
+            if let Some(relative_path) = module_info.spare_module_path {
+                format!(
+                    "Some(include_bytes!(\"{}{}\"))",
+                    crate::root_dir_from_out_relative!(),
+                    relative_path.as_str(),
+                )
+            } else {
+                String::from("None")
+            };
         let str = format!(
-            "pub static {}_MODULE_WASM: &[u8] = include_bytes!(\"{absolute_path}\");",
+            "pub static {}_MODULE_WASM: crate::wasm::WasmModuleInfo = crate::wasm::WasmModuleInfo {{
+                data: include_bytes!(\"{absolute_path}\"),
+                spare_module_data: {spare_module_absolute_path_opt},
+            }};",
             module_name.to_uppercase()
         );
         writeln!(module_mappings_file, "{str}").unwrap();
