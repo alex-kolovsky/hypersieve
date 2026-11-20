@@ -15,7 +15,7 @@ pub fn get_properties(
     // Extract the vector length (VLEN).
     let vlen = guest_node
         .property("vlen")
-        .expect("No vlen property in DTS")
+        .expect("[FATAL][CONFIG]: no vlen property in DTS")
         .as_usize()
         .unwrap();
 

@@ -28,7 +28,7 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
     for req in target_arch.get_required_modules() {
         assert!(
             module_config.mappings.contains_key(&req),
-            "Missing nodule declaration: {}",
+            "[FATAL][CONFIG]: missing nodule declaration: {}",
             req
         );
     }
@@ -53,6 +53,7 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
             };
         let str = format!(
             "pub static {}_MODULE_WASM: crate::wasm::WasmModuleInfo = crate::wasm::WasmModuleInfo {{
+                name: \"{module_name}\",
                 data: include_bytes!(\"{absolute_path}\"),
                 spare_module_data: {spare_module_absolute_path_opt},
             }};",

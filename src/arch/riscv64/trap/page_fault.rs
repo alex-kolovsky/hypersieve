@@ -336,7 +336,9 @@ fn handle_vector_instruction(
 
             vcpu_ref.vrs[vs3_id] = vector_load(size, requested_guest_addr);
         }
-        _ => panic!("Unsupported instruction opcode: {opcode:#x}"),
+        _ => panic!(
+            "[CRITICAL][TRAP]: unsupported instruction opcode on the guest page fault: {opcode:#x}"
+        ),
     }
 }
 
@@ -425,7 +427,10 @@ fn handle_amo(htinst: u64, requested_guest_addr: u64, vcpu_ref: &mut Vcpu) {
         0x14 => (mem_val as i64).max(guest_operand as i64) as u64, // amomax
         0x18 => mem_val.min(guest_operand),                        // amominu
         0x1C => mem_val.max(guest_operand),                        // amomaxu
-        _ => panic!("Unsupported AMO type: {:#x}", funct5),
+        _ => panic!(
+            "[CRITICAL][TRAP]: unsupported AMO type on the guest page fault, funct5: {:#x}",
+            funct5
+        ),
     };
 
     // Write this new value to the memory.

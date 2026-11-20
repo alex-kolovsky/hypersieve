@@ -109,7 +109,7 @@ impl HartInterface for HartFunctions {
 
         if error_code != 0 {
             panic!(
-                "Error occurred while waking up harts\nError code: {error_code}\nValue: {value}"
+                "[FATAL][SBI]: error occurred while waking up harts: error code: {error_code}, Value: {value}"
             );
         }
     }

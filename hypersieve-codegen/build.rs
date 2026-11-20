@@ -84,7 +84,10 @@ macro_rules! codegen_out_dir {{
     };
 
     if !SUPPORTED_ARCHS.contains(&target_arch.name.as_str()) {
-        panic!("{} architecture is not supported.", target_arch.name);
+        panic!(
+            "[FATAL][BUILD]: {} architecture is not supported.",
+            target_arch.name
+        );
     }
 
     // Compile and parse the hardware device tree file.

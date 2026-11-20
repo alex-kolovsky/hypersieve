@@ -55,7 +55,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
         for peripheral in soc.children() {
             let memory_policy_str = peripheral
                 .property("memory-policy")
-                .expect("No memory-policy field in the hardware DTS")
+                .expect("[FATAL][CONFIG]: no memory-policy field in the hardware DTS")
                 .as_str()
                 .unwrap();
 
@@ -64,12 +64,14 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
             } else if memory_policy_str == "passthrough" {
                 MmioPolicy::Passthrough
             } else {
-                panic!("Unsupported memory policy");
+                panic!(
+                    "[FATAL][CONFIG]: unsupported memory policy: {memory_policy_str}, allowed are: \"passthrough\"/\"emulate\""
+                );
             };
 
             let compatible: String = peripheral
                 .property("compatible")
-                .expect("No compatible field in the hardware DTS")
+                .expect("[FATAL][CONFIG]: no compatible field in the hardware DTS")
                 .as_str()
                 .unwrap()
                 .to_string();
@@ -79,12 +81,12 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
 
             let reg = peripheral
                 .property("reg")
-                .expect("No reg field in the hardware DTS");
+                .expect("[FATAL][CONFIG]no reg field in the hardware DTS");
             // Convert a raw `reg` DTB property into native array.
             let reg_raw = reg.value;
 
             if reg_raw.len() % 8 != 0 {
-                panic!("reg cell is not a multiple of 8 bytes");
+                panic!("[FATAL][CONFIG]: MMIO reg cell is not a multiple of 8 bytes");
             }
 
             let (chunks, _remainder) = reg_raw.as_chunks::<8>();
@@ -96,7 +98,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 // Panic if the memory address sum overflows.
                 base_addr.checked_add(size).unwrap_or_else(|| {
                     panic!(
-                        "Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
+                        "[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
                     )
                 });
 

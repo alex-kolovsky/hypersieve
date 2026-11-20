@@ -41,7 +41,7 @@ pub fn run(hart_id: usize) -> ! {
 
 #[doc(hidden)]
 pub fn print_and_wfi(info: &core::panic::PanicInfo) -> ! {
-    println!("panic: {}", info);
+    println!("{}", info);
     loop {
         arch::Cpu::wait_for_interrupt();
     }

@@ -25,9 +25,6 @@ pub fn hart_init(hart_id: usize) -> ! {
 }
 
 pub fn jump_in_guest(hart_id: usize) -> ! {
-    if HARTS.len() <= hart_id {
-        panic!("Excess hart, hart id: {hart_id}");
-    }
     let hart = &crate::HARTS[hart_id];
     let is_assigned = hart.is_assigned;
     if is_assigned {
@@ -75,5 +72,5 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
     }
 
     // A hart is excess if there are no free guests for it.
-    panic!("Couldn't find a job for a hart, hart id: {hart_id}");
+    panic!("[WARN][INIT]: Couldn't find a job for a hart, hart id: {hart_id}");
 }

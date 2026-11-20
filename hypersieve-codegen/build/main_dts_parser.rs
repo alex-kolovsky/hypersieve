@@ -40,11 +40,11 @@ pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) 
         // Input path.
         .arg(dts_source_path)
         .output()
-        .expect("Failed to execute 'dtc'. Is device-tree-compiler installed on your system?");
+        .expect("[FATAL][BUILD]: failed to execute 'dtc'. Is device-tree-compiler installed on your system?");
 
     if !dtc_output.status.success() {
         panic!(
-            "DTC Compilation Error: {}",
+            "[FATAL][BUILD]: DTC Compilation Error: {}",
             String::from_utf8_lossy(&dtc_output.stderr)
         );
     }
@@ -84,7 +84,7 @@ pub fn parse_dts(
     if let Some(hypervisor) = fdt.find_node("/hypervisor-config") {
         let system_mmio_windows_raw = hypervisor
             .property("mmio-windows")
-            .expect("No mmio-windows property in DTS")
+            .expect("[FATAL][CONFIG]: no mmio-windows property in DTS")
             .value;
         let (chunks, _remainder) = system_mmio_windows_raw.as_chunks::<8>();
 
@@ -94,7 +94,7 @@ pub fn parse_dts(
 
             // Panic if the memory address sum overflows.
             base_addr.checked_add(size).unwrap_or_else(|| {
-                panic!("Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows")
+                panic!("[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows")
             });
 
             system_mmio_windows.push(MemoryRegion { base_addr, size });
@@ -105,19 +105,19 @@ pub fn parse_dts(
             // Extract the VM entry address.
             let entry_gpa = guest
                 .property("entry")
-                .expect("No entry field in DTS")
+                .expect("[FATAL][CONFIG]: no entry field in DTS")
                 .as_usize()
-                .expect("Entry is not an integer");
+                .expect("[FATAL][CONFIG]: entry is not an integer");
             // Extract the hart capacity for the VM.
             let hart_capacity = guest
                 .property("hart-capacity")
-                .expect("No hart-capacity field in DTS")
+                .expect("[FATAL][CONFIG]: no hart-capacity field in DTS")
                 .as_usize()
                 .unwrap();
 
             let allowed_mmio_raw = guest
                 .property("allowed-mmio")
-                .expect("No allowed-mmio field in the hardware DTS");
+                .expect("[FATAL][CONFIG]: no allowed-mmio field in the hardware DTS");
 
             crate::build_modules::arch::parse_arch_related_values_from_dts(
                 &guest,
@@ -136,7 +136,7 @@ pub fn parse_dts(
                 // Panic if the memory address sum overflows.
                 base_addr.checked_add(size).unwrap_or_else(|| {
                     panic!(
-                        "Memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
+                        "[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
                     )
                 });
                 let is_in_window = system_mmio_windows
@@ -155,7 +155,7 @@ pub fn parse_dts(
                     allowed_mmio.push(MemoryRegion { base_addr, size });
                 } else {
                     panic!(
-                        "Allowed MMIO address {base_addr:#x} falls outside of system MMIO windows"
+                        "[FATAL][CONFIG]: allowed MMIO address {base_addr:#x} falls outside of system MMIO windows"
                     );
                 }
             }
@@ -165,13 +165,13 @@ pub fn parse_dts(
                 crate::root_dir!(),
                 guest
                     .property("path")
-                    .expect("No path field in DTS")
+                    .expect("[FATAL][CONFIG]: no path field in DTS")
                     .as_str()
                     .unwrap()
             );
 
             if !target_arch.is_wasm32() && !std::path::Path::exists(std::path::Path::new(&path)) {
-                panic!("Guest file {path} not found");
+                panic!("[FATAL][CONFIG]: guest file {path} is not found");
             }
 
             let (aligned_passthrough_mmio_regions, allowed_mmio_peripherals) =
@@ -198,7 +198,7 @@ pub fn parse_dts(
                 let guest_assigned_harts_raw = guest_assigned_harts.value;
 
                 if guest_assigned_harts_raw.len() % 4 != 0 {
-                    panic!("assigned-harts cell is not a multiple of 4 bytes");
+                    panic!("[FATAL][CONFIG]: assigned-harts cell is not a multiple of 4 bytes");
                 }
 
                 let mut guest_assigned_harts = Vec::new();
@@ -212,7 +212,10 @@ pub fn parse_dts(
 
                 if harts.len() > hart_capacity {
                     panic!(
-                        "Assigned harts count ({}) cannot be bigger than harts capacity ({hart_capacity})\nGuest name: {}",
+                        "[FATAL][CONFIG]: assigned harts count cannot be bigger than the whole hart capacity
+    assigned harts count: {}
+    whole hart capacity: {hart_capacity}
+    guest name: {}",
                         harts.len(),
                         guest.name,
                     );
@@ -248,7 +251,7 @@ pub fn parse_dts(
             }
         }
     } else {
-        panic!("No hypervisor configuration in DTS");
+        panic!("[FATAL][CONFIG]: no hypervisor configuration in DTS");
     }
 
     // Populate Hart structures for the 'harts' vector.

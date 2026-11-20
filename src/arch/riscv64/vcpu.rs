@@ -116,7 +116,7 @@ impl crate::arch::VcpuInterface for Vcpu {
         host_hart_id: usize,
         guest_id_for_hart: usize,
     ) {
-        let vstimecmp = read_csr!("time") + TIMER_OFFSET;
+        let vstimecmp = read_csr!("time").wrapping_add(TIMER_OFFSET);
 
         // Fill the new vcpu with correct values for this hart.
         self.vstimecmp = vstimecmp;
@@ -182,7 +182,7 @@ impl crate::arch::VcpuInterface for Vcpu {
 
     fn very_fisrt_run(&mut self, host_hart_id: usize, guest_id_for_hart: usize) -> ! {
         // Set guest supervisor timer compare value.
-        let vstimecmp = crate::read_csr!("time").wrapping_add(crate::read_csr!("htimedelta"));
+        let vstimecmp = crate::read_csr!("time").wrapping_add(TIMER_OFFSET);
         self.vstimecmp = vstimecmp;
 
         self.guest_id_for_hart = guest_id_for_hart;

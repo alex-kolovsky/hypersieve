@@ -53,7 +53,7 @@ impl MmioMemoryRegion {
                     .mappings
                     .get(compatible)
                     .unwrap_or_else(|| {
-                        panic!("Driver to the compatible field \"{compatible}\" must be set.")
+                        panic!("[FATAL][CONFIG]: driver to the compatible field \"{compatible}\" must be set.")
                     })
                     .clone();
                 Some(emulation_fn_str)
@@ -188,7 +188,9 @@ pub static GUESTS: [Guest; {}] = [
         let assigned_hart_count = guest.assigned_harts.iter().flatten().count();
 
         if assigned_hart_count > guest.hart_capacity {
-            panic!("Assigned hart count cannot be bigger than general hart capacity.")
+            panic!(
+                "[FATAL][CONFIG]: assigned hart count cannot be bigger than the whole hart capacity."
+            )
         }
 
         // Add guest entry in GUESTS array.

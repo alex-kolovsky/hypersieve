@@ -5,6 +5,7 @@ pub struct WasmModule<T>
 where
     T: Clone,
 {
+    name: &'static str,
     instance: Instance,
     store: Store<T>,
     panic_count: u8,
@@ -16,6 +17,7 @@ where
 
 #[derive(Debug)]
 pub struct WasmModuleInfo {
+    pub name: &'static str,
     pub data: &'static [u8],
     pub spare_module_data: Option<&'static [u8]>,
 }
@@ -27,7 +29,6 @@ where
 {
     instance: Instance,
     store: Store<T>,
-    panic_count: u8,
     standard_store_value: T,
     linker: Linker<T>,
     module: Module,
@@ -38,8 +39,13 @@ impl<T> SpareWasmModule<T>
 where
     T: Clone,
 {
-    fn into_wasm_module(self, wasm_module: Option<SpareWasmModule<T>>) -> WasmModule<T> {
+    fn into_wasm_module(
+        self,
+        wasm_module: Option<SpareWasmModule<T>>,
+        name: &'static str,
+    ) -> WasmModule<T> {
         WasmModule {
+            name,
             instance: self.instance,
             store: self.store,
             panic_count: 0,
@@ -60,6 +66,7 @@ where
         store_value: T,
         spare_wasm_module_data: Option<&[u8]>,
         initialize_module_functions: fn(&mut Linker<T>),
+        name: &'static str,
     ) -> Self {
         let engine = ENGINE.get().unwrap();
         let mut store = Store::new(engine, store_value.clone());
@@ -76,14 +83,21 @@ where
 
         let spare_wasm_module = if let Some(data) = spare_wasm_module_data {
             Some(
-                WasmModule::new(data, store_value.clone(), None, initialize_module_functions)
-                    .into_spare_wasm_module(false),
+                WasmModule::new(
+                    data,
+                    store_value.clone(),
+                    None,
+                    initialize_module_functions,
+                    name,
+                )
+                .into_spare_wasm_module(false),
             )
         } else {
             None
         };
 
         Self {
+            name,
             instance,
             store,
             panic_count: 0,
@@ -98,7 +112,6 @@ where
         SpareWasmModule {
             instance: self.instance,
             store: self.store,
-            panic_count: 0,
             standard_store_value: self.standard_store_value,
             linker: self.linker,
             module: self.module,
@@ -108,14 +121,21 @@ where
     fn switch_with_spare_module(mut self) -> Self {
         let spare_module = self.spare_wasm_module.take().unwrap();
 
+        let module_name = self.name;
+
         let switched_module = self.into_spare_wasm_module(true);
-        spare_module.into_wasm_module(Some(switched_module))
+        spare_module.into_wasm_module(Some(switched_module), module_name)
     }
 
-    fn recover(mut self) -> Self {
+    fn recover(mut self, cause: wasmi::Error) -> Self {
         match self.panic_count {
             // At the first panic of the module, simply reset its Store.
             0 => {
+                crate::println!(
+                    "\n[WARN][MODULES]: {} module '{}' panicked (1/3): {cause}",
+                    self.spare_prefix(),
+                    self.name
+                );
                 self.panic_count += 1;
 
                 self.reset_store();
@@ -123,6 +143,11 @@ where
             }
             // At the second - reset its Instance and Store.
             1 => {
+                crate::println!(
+                    "\n[WARN][MODULES]: {} module '{}' panicked (2/3): {cause}",
+                    self.spare_prefix(),
+                    self.name
+                );
                 self.panic_count += 1;
 
                 self.reset_instance();
@@ -131,16 +156,26 @@ where
             // Replace the current module with the spare one on the third fault.
             2 => {
                 if let Some(spare_wasm_module) = &self.spare_wasm_module {
-                    crate::println!("\nModule panicked for the third time");
                     if spare_wasm_module.is_switched {
                         // If even the spare module faulted, panic.
-                        panic!("Fatal panic on the spare module");
+                        panic!(
+                            "[CRITICAL][MODULES]: spare '{}' reached panic limit (3/3), module is destroyed: {cause}",
+                            self.name
+                        );
                     }
+
+                    crate::println!(
+                        "\n[ERROR][MODULES]: module '{}' panicked (3/3), switching to the spare module: {cause}",
+                        self.name
+                    );
 
                     self.switch_with_spare_module()
                 } else {
-                    // Panic on the third fault if module has no spare the spare one.
-                    panic!("Fatal panic on the module that doesn't have a spare module",);
+                    // Panic on the third fault if module has no spare module configured.
+                    panic!(
+                        "[CRITICAL][MODULES]: '{}' reached panic limit (3/3), no spare module configured, module is destroyed: {cause}",
+                        self.name
+                    );
                 }
             }
             _ => unreachable!(),
@@ -165,6 +200,15 @@ where
 
         *old_instance = instance.unwrap();
     }
+    fn spare_prefix(&self) -> &'static str {
+        if let Some(ref spare) = self.spare_wasm_module
+            && spare.is_switched
+        {
+            "spare"
+        } else {
+            ""
+        }
+    }
 }
 
 pub static ENGINE: spin::Once<Engine> = spin::Once::new();
@@ -183,6 +227,7 @@ pub fn init_wasm_modules() {
         0u32,
         crate::CLAIM_ASSIGNED_GUEST_MODULE_WASM.spare_module_data,
         init_claim_assigned_guest_module,
+        "claim_assigned_guest",
     ));
     drop(claim_assigned_guest);
 
@@ -192,6 +237,7 @@ pub fn init_wasm_modules() {
         0u32,
         crate::CLAIM_GUEST_MODULE_WASM.spare_module_data,
         init_claim_guest_module,
+        "claim_guest",
     ));
     drop(claim_guest);
 }
@@ -224,8 +270,6 @@ pub struct Modules;
 
 impl Modules {
     pub fn claim_guest(guest_id: usize) -> u32 {
-        let module_name = "claim_guest";
-
         let mut module_lock = CLAIM_GUEST_MODULE.lock();
 
         // Subsequent loop iterations restore the module if it will panic.
@@ -235,7 +279,7 @@ impl Modules {
             let mut store = &mut module.store;
 
             let function = instance
-                .get_typed_func::<u32, u32>(&store, module_name)
+                .get_typed_func::<u32, u32>(&store, module.name)
                 .unwrap();
 
             let result = function.call(&mut store, guest_id as u32);
@@ -245,15 +289,13 @@ impl Modules {
                 *module_lock = Some(module);
                 drop(module_lock);
                 return guest_id;
-            } else {
-                module = module.recover();
+            } else if let Err(cause) = result {
+                *module_lock = Some(module.recover(cause));
                 continue;
             }
         }
     }
     pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
-        let module_name = "claim_assigned_guest";
-
         let mut module_lock = CLAIM_ASSIGNED_GUEST_MODULE.lock();
 
         // Subsequent loop iterations restore the module if it will panic.
@@ -263,7 +305,7 @@ impl Modules {
             let store = &mut module.store;
 
             let function = instance
-                .get_typed_func::<(u32, u32), u32>(&*store, module_name)
+                .get_typed_func::<(u32, u32), u32>(&*store, module.name)
                 .unwrap();
 
             let result = function.call(&mut *store, (guest_id as u32, hart_id as u32));
@@ -273,8 +315,8 @@ impl Modules {
                 *module_lock = Some(module);
                 drop(module_lock);
                 return local_guest_id;
-            } else {
-                *module_lock = Some(module.recover());
+            } else if let Err(cause) = result {
+                *module_lock = Some(module.recover(cause));
                 continue;
             }
         }

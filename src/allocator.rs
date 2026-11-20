@@ -12,8 +12,8 @@ unsafe extern "C" {
 
 pub fn alloc_pages(len: usize) -> *mut u8 {
     let aligned_len = (len + 4095) & !4095;
-    let layout =
-        core::alloc::Layout::from_size_align(aligned_len, 4096).expect("Invalid layout parameters");
+    let layout = core::alloc::Layout::from_size_align(aligned_len, 4096)
+        .expect("[FATAL][ALLOCATOR]: invalid layout parameters");
     unsafe { ALLOCATOR.alloc_zeroed(layout) }
 }
 

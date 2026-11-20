@@ -24,7 +24,7 @@ pub fn handle_ecall(vcpu_ref: &mut Vcpu) {
                 asm!("ecall", in("a7") 0x01, in("a0") a0);
             }
             ecall_eid => {
-                panic!("Ecall EID ({ecall_eid}) cannot be processed.")
+                panic!("[CRITICAL][TRAP]: ecall EID ({ecall_eid}) cannot be processed.")
             }
         }
 

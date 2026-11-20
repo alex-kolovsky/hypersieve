@@ -132,7 +132,10 @@ impl GuestPageTable {
         }
 
         let entry = table.entry_by_addr(guest_paddr, 0);
-        assert!(!entry.is_valid(), "already mapped");
+        assert!(
+            !entry.is_valid(),
+            "[CRITICAL][GPT]: tried to map already mapped page, allocation was performed, GPA: {guest_paddr}"
+        );
         *entry = PageEntry::new(host_paddr, flags | PTE_V | PTE_U);
     }
 
@@ -163,7 +166,7 @@ impl GuestPageTable {
                 flags | PTE_V | PTE_U,
             );
         } else {
-            crate::println!("Already mapped");
+            crate::println!("[WARN][GPT]: tried to map already mapped page, GPA: {guest_paddr}");
         }
     }
 }

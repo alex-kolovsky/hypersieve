@@ -7,9 +7,17 @@ pub fn fatal_exception(exception_info: ExceptionInfo, hart_id: usize) -> ! {
         &exception_info.exception_code,
         &exception_info.interrupt_bit,
     );
+
     panic!(
-        "A trap occurred ({})\nexception code: (interrupt bit: {}) {}\nhart id: {hart_id}, vsstatus: {:#b}\nsstatus: {:#b}\nsepc: {:#x}\nstval: {:#x}",
-        scause_str,
+        "[CRITICAL][TRAP]: unrecoverable guest exception occurred
+            name: {scause_str}
+            interrupt bit: {}
+            exception code: {}
+            hart id: {hart_id}
+            vsstatus: {:#x}
+            sstatus: {:#x}
+            sepc: {:#x}
+            stval: {:#x}",
         exception_info.interrupt_bit,
         exception_info.exception_code,
         read_csr!("vsstatus"),
