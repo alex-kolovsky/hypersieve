@@ -125,7 +125,7 @@ macro_rules! codegen_out_dir {{
         );
 
         // Parse the driver configuration file.
-        let drivers_config = crate::build_modules::drivers::parse(&target_arch);
+        let drivers_config = crate::build_modules::drivers::parse();
 
         // Generate guest constants file.
         build_modules::guest_constants::generate_guest_constants(

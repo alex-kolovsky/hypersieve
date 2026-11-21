@@ -41,7 +41,7 @@ Currently, the hypervisor includes three configuration files:
 * `config.dts` — Contains a description of the guests and the system.
 * `hardware.dts` — Describes the memory-mapped I/O (MMIO) devices.
 * `modules.toml` — Binds module names to their paths.
-* `src/arch/riscv64/mmio/drivers.toml` — Binds drivers to those MMIO devices, if required.
+* `drivers.toml` — Binds drivers to those MMIO devices, if required.
 
 In addition, the hypervisor includes several test files:
 

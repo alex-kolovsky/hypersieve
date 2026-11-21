@@ -209,6 +209,7 @@ where
 
         *old_instance = instance;
     }
+
     fn spare_prefix(&self) -> &'static str {
         if let Some(ref spare) = self.spare_wasm_module
             && spare.is_switched
