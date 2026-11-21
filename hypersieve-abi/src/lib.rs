@@ -16,8 +16,6 @@ pub const GUEST_INDEXES: [usize; GUESTS_COUNT] = {
     guest_indexes
 };
 
-pub trait PageFaultInfoWrapper {}
-
 pub struct GuestInfo {
     pub id: usize,
     pub active_hart_count: AtomicUsize,

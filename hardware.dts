@@ -17,8 +17,8 @@
 			// entry function in the `src/mmio/drivers.toml` file.
 			memory-policy = "passthrough";
 		};
-		m: serial@FFFFFFFFDEADBEEF {
-            compatible = "m";
+		print_letter_m: serial@FFFFFFFFDEADBEEF {
+            compatible = "print_letter_m";
 
 			reg = <0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;
 

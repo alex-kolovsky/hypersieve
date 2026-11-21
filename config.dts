@@ -19,7 +19,7 @@
 
             // Size of the vector registers.
             // To turn off the vector extension,
-            // set the vlen-size parameter to zero.
+            // remove or the vlen-size parameter to zero.
             vlen = <128>;
 
             // Maximum number of total Harts a guest can use, combining both assigned and shared Harts.
@@ -40,13 +40,11 @@
             allowed-mmio = <0x0 0x10000000 0x0 0x1 0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;
 
             // Virtual address of the guest entry.
-            entry = <0x0>;
+            entry = <0x0 0x0>;
         };
 
         // Configuration for the second guest VM.
         vm1 {
-            vlen = <0>;
-
             // Enables the floating-point extension;
             // comment out or delete this parameter to disable it.
             floating-point-extension;
@@ -56,7 +54,7 @@
             hart-capacity = <2>;
             allowed-mmio = <0x0 0x10000000 0x0 0x1>;
 
-            entry = <0x100000>;
+            entry = <0x0 0x100000>;
         };
     };
 };

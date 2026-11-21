@@ -36,7 +36,7 @@ cargo run --release
 
 ## Modifying Configurations
 
-Currently, the hypervisor includes three configuration files:
+Currently, the hypervisor includes these configuration files:
 
 * `config.dts` — Contains a description of the guests and the system.
 * `hardware.dts` — Describes the memory-mapped I/O (MMIO) devices.
@@ -52,6 +52,8 @@ In addition, the hypervisor includes several test files:
 All of these test scenarios are pre-configured in the aforementioned configuration files.
 Detailed instructions and rules for making custom modifications
 are specified directly within the configuration files themselves.
+
+To learn more about modifying configuration files, visit the [official documentation](https://kolovsky.me/hypersieve)
 
 ## License
 
