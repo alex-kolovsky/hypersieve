@@ -3,7 +3,8 @@ use std::io::Write;
 pub fn generate_hart_constants(out_dir: &str, harts: &Vec<crate::Hart>) {
     // Create the file path for the hart constants.
     let hart_constants_file_path = std::path::Path::new(out_dir).join("hart_constants.rs");
-    let mut hart_constants_file = std::fs::File::create(hart_constants_file_path).unwrap();
+    let mut hart_constants_file = std::fs::File::create(hart_constants_file_path)
+        .expect("[FATAL][BUILD]: failed to create a file");
 
     let mut max_supported_assigned_guests_per_hart = 0;
 
@@ -24,7 +25,7 @@ use hypersieve_abi::ASSIGNED_GUESTS_BY_HART_ID;
 pub static HARTS: [Hart; TOTAL_HART_CAPACITY] = [
 ",
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 
     for hart in harts {
         let is_hart_assigned = !hart.guests.is_empty();
@@ -39,8 +40,9 @@ Hart {{
         ",
         hart.hart_id,
         )
-        .unwrap();
+        .expect("[FATAL][BUILD]: failed to perform a write to the file");
     }
 
-    writeln!(hart_constants_file, "];").unwrap();
+    writeln!(hart_constants_file, "];")
+        .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

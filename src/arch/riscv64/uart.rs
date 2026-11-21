@@ -45,8 +45,8 @@ impl Uart {
             // Divisor = ( system_clock_speed ) / ( 16 * desired_baud_rate )
             let divisor = 3_686_400 / (16 * 115_200);
 
-            let divisor_least: u8 = (divisor & 0xff).try_into().unwrap();
-            let divisor_most: u8 = (divisor >> 8).try_into().unwrap();
+            let divisor_least: u8 = (divisor & 0xff) as u8;
+            let divisor_most: u8 = (divisor >> 8) as u8;
 
             // Set DLL and DLM.
             write_volatile(uart_ptr.offset(0), divisor_least);
@@ -85,5 +85,7 @@ macro_rules! println {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    UART.lock().write_fmt(args).unwrap();
+    UART.lock()
+        .write_fmt(args)
+        .expect("[CRITICAL][UART]: failed to write arguments to the uart");
 }

@@ -61,7 +61,8 @@ pub fn parse_dts(
     compile_dts(&dtb_output_path, CONFIG_DTS_PATH);
 
     // Parse Device Tree Binary file.
-    let dtb_data = std::fs::read(dtb_output_path).unwrap();
+    let dtb_data = std::fs::read(dtb_output_path)
+        .expect("[FATAL][BUILD]: failed to read the main description file");
 
     // A vector of all assigned harts in a system.
     let mut harts: Vec<Hart> = Vec::new();
@@ -80,7 +81,10 @@ pub fn parse_dts(
     let mut system_mmio_windows: Vec<MemoryRegion> = Vec::new();
 
     let mut guests: Vec<Guest> = Vec::new();
-    let fdt = fdt::Fdt::new(&dtb_data).unwrap();
+
+    let fdt =
+        fdt::Fdt::new(&dtb_data).expect("[FATAL][BUILD]: failed to parse DT file into Fdt struct");
+
     if let Some(hypervisor) = fdt.find_node("/hypervisor-config") {
         let system_mmio_windows_raw = hypervisor
             .property("mmio-windows")
@@ -93,9 +97,9 @@ pub fn parse_dts(
             let size: u64 = u64::from_be_bytes(bytes[1]);
 
             // Panic if the memory address sum overflows.
-            base_addr.checked_add(size).unwrap_or_else(|| {
-                panic!("[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows")
-            });
+            base_addr
+                .checked_add(size)
+                .expect("[FATAL][CONFIG]: memory address sum (base_addr + size) overflows");
 
             system_mmio_windows.push(MemoryRegion { base_addr, size });
         }
@@ -113,7 +117,7 @@ pub fn parse_dts(
                 .property("hart-capacity")
                 .expect("[FATAL][CONFIG]: no hart-capacity field in DTS")
                 .as_usize()
-                .unwrap();
+                .expect("[FATAL][CONFIG]: failed to parse memory policy field into usize");
 
             let allowed_mmio_raw = guest
                 .property("allowed-mmio")
@@ -134,11 +138,9 @@ pub fn parse_dts(
                 let size: u64 = u64::from_be_bytes(bytes[1]);
 
                 // Panic if the memory address sum overflows.
-                base_addr.checked_add(size).unwrap_or_else(|| {
-                    panic!(
-                        "[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
-                    )
-                });
+                base_addr
+                    .checked_add(size)
+                    .expect("[FATAL][CONFIG]: memory address sum (base_addr + size) overflows");
                 let is_in_window = system_mmio_windows
                     .binary_search_by(|region| {
                         if base_addr < region.base_addr {
@@ -167,7 +169,7 @@ pub fn parse_dts(
                     .property("path")
                     .expect("[FATAL][CONFIG]: no path field in DTS")
                     .as_str()
-                    .unwrap()
+                    .expect("[FATAL][CONFIG]: failed to parse memory policy field into string")
             );
 
             if !target_arch.is_wasm32() && !std::path::Path::exists(std::path::Path::new(&path)) {

@@ -5,7 +5,8 @@ pub fn generate_floating_point_extension_support(out_dir: &str, is_fp_needed: bo
     let floating_point_extension_support_file_path =
         std::path::Path::new(out_dir).join("floating_point_extension_support.rs");
     let mut floating_point_extension_support_file =
-        std::fs::File::create(&floating_point_extension_support_file_path).unwrap();
+        std::fs::File::create(&floating_point_extension_support_file_path)
+            .expect("[FATAL][BUILD]: failed to create a file");
 
     // Skip adding floating-point support if disabled in the device tree.
     if is_fp_needed {
@@ -170,7 +171,7 @@ extern \"C\" fn restore_fprs(vcpu: *mut Vcpu) {{
     );
 }}"
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }
 fn write_empty_floating_point_extension_support_file(
     floating_point_extension_support_file: &mut std::fs::File,
@@ -188,5 +189,5 @@ pub const fn save_fprs(vcpu: *mut Vcpu) {{}}
 pub const fn restore_fprs(vcpu: *mut Vcpu) {{}}
 "
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

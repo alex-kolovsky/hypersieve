@@ -7,8 +7,10 @@ pub fn generate_guest_abi_constants(
 ) {
     let guest_abi_constants_file_path =
         std::path::Path::new(out_dir).join("guest_abi_constants.rs");
-    let mut guest_abi_constants_file =
-        std::fs::File::create(guest_abi_constants_file_path).unwrap();
+
+    let mut guest_abi_constants_file = std::fs::File::create(guest_abi_constants_file_path)
+        .expect("[FATAL][BUILD]: failed to create a file");
+
     let max_supported_harts_per_guest = hypervisor_configuration.max_supported_harts_per_guest;
     let max_supported_assigned_harts_per_guest =
         hypervisor_configuration.max_supported_assigned_harts_per_guest;
@@ -22,5 +24,5 @@ pub const GUESTS_COUNT: usize = {};
     ",
         hypervisor_configuration.guests.len(),
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

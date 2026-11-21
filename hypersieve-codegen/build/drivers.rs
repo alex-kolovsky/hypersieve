@@ -5,6 +5,9 @@ pub struct DriverConfig {
 
 pub fn parse(target_arch: &crate::TargetArch) -> DriverConfig {
     let toml_content = crate::build_modules::arch::get_driver_config(target_arch);
-    let config: DriverConfig = toml::from_str(&toml_content).unwrap();
+
+    let config: DriverConfig =
+        toml::from_str(&toml_content).expect("[FATAL][BUILD]: failed to parse Toml file");
+
     config
 }

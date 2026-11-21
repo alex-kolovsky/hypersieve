@@ -14,14 +14,20 @@ pub struct ModulesConfig {
 
 pub fn parse() -> ModulesConfig {
     // Parse the toml file directly into the ModulesConfig struct.
-    let toml_content = std::fs::read_to_string(crate::MODULES_TOML_PATH).unwrap();
-    let config: ModulesConfig = toml::from_str(&toml_content).unwrap();
+    let toml_content = std::fs::read_to_string(crate::MODULES_TOML_PATH)
+        .expect("[FATAL][BUILD]: failed to read the modules description file");
+
+    let config: ModulesConfig =
+        toml::from_str(&toml_content).expect("[FATAL][BUILD]: failed to parse Toml file");
     config
 }
 
 pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
     let module_mappings_file_path = std::path::Path::new(out_dir).join("module_mappings.rs");
-    let mut module_mappings_file = std::fs::File::create(module_mappings_file_path).unwrap();
+
+    let mut module_mappings_file = std::fs::File::create(module_mappings_file_path)
+        .expect("[FATAL][BUILD]: failed to create a file");
+
     let module_config = parse();
 
     // Ensure that all required modules are declared in the file.
@@ -59,6 +65,8 @@ pub fn generate_module_paths(target_arch: &crate::TargetArch, out_dir: &str) {
             }};",
             module_name.to_uppercase()
         );
-        writeln!(module_mappings_file, "{str}").unwrap();
+
+        writeln!(module_mappings_file, "{str}")
+            .expect("[FATAL][BUILD]: failed to perform a write to the file");
     }
 }

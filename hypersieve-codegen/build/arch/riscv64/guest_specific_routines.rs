@@ -45,5 +45,5 @@ pub fn generate_guest_specific_routine(
 {trap_routine_function}
 {switch_routine_function}"
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

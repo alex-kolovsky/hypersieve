@@ -5,7 +5,8 @@ pub fn generate_vector_extension_support(out_dir: &str, max_vlen: usize) {
     let vector_extension_support_file_path =
         std::path::Path::new(out_dir).join("vector_extension_support.rs");
     let mut vector_extension_support_file =
-        std::fs::File::create(&vector_extension_support_file_path).unwrap();
+        std::fs::File::create(&vector_extension_support_file_path)
+            .expect("[FATAL][BUILD]: failed to create a file");
 
     // If VLEN size declared in the device tree file is 0,
     // vector extension support must not be added.
@@ -196,7 +197,7 @@ extern \"C\" fn restore_vrs(vcpu: *mut Vcpu) {{
     );
 }}"
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }
 fn write_empty_vector_extension_support_file(vector_extension_support_file: &mut std::fs::File) {
     writeln!(
@@ -214,5 +215,5 @@ pub const fn save_vrs(vcpu: *mut Vcpu) {{}}
 pub const fn restore_vrs(vcpu: *mut Vcpu) {{}}
 "
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

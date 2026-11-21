@@ -1,5 +1,5 @@
 use crate::{
-    GUESTS, HARTS, MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART,
+    GUESTS, MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART,
     arch::{HartFunctions, HartInterface, VcpuInterface},
 };
 use core::cell::UnsafeCell;
@@ -48,7 +48,7 @@ pub fn jump_in_guest(hart_id: usize) -> ! {
                     if is_claimed {
                         let vcpu_ptr = (*hart.assigned_guest_vcpus.get())[local_guest_id]
                             .take()
-                            .unwrap();
+                            .expect("[CRITICAL][INIT]: failed to take an assigned vcpu pointer");
                         vcpu_ptr.very_fisrt_run(hart_id, local_guest_id);
                     }
                 }

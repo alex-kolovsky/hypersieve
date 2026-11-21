@@ -45,9 +45,11 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
     crate::build_modules::main_dts_parser::compile_dts(&dtb_output_path, "../hardware.dts");
 
     // Parse Device Tree Binary file.
-    let dtb_data = std::fs::read(dtb_output_path).unwrap();
+    let dtb_data = std::fs::read(dtb_output_path)
+        .expect("[FATAL][BUILD]: failed to read the hardware description file");
 
-    let fdt = fdt::Fdt::new(&dtb_data).unwrap();
+    let fdt =
+        fdt::Fdt::new(&dtb_data).expect("[FATAL][BUILD]: failed to parse DT file into Fdt struct");
 
     let mut mmio_peripherals: Vec<MmioPeripheral> = Vec::new();
 
@@ -57,7 +59,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 .property("memory-policy")
                 .expect("[FATAL][CONFIG]: no memory-policy field in the hardware DTS")
                 .as_str()
-                .unwrap();
+                .expect("[FATAL][CONFIG]: failed to parse memory policy field into string");
 
             let policy = if memory_policy_str == "emulate" {
                 MmioPolicy::Emulate
@@ -73,7 +75,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 .property("compatible")
                 .expect("[FATAL][CONFIG]: no compatible field in the hardware DTS")
                 .as_str()
-                .unwrap()
+                .expect("[FATAL][CONFIG]: failed to parse compatible field into string")
                 .to_string();
 
             // Extract addresses of peripheral (reg).
@@ -96,11 +98,9 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 let size: u64 = u64::from_be_bytes(bytes[1]);
 
                 // Panic if the memory address sum overflows.
-                base_addr.checked_add(size).unwrap_or_else(|| {
-                    panic!(
-                        "[FATAL][CONFIG]: memory address sum (base_addr: {base_addr:#x}, size: {size:#x}) overflows"
-                    )
-                });
+                base_addr
+                    .checked_add(size)
+                    .expect("[FATAL][CONFIG]: memory address sum (base_addr + size ) overflows");
 
                 let region = MemoryRegion { base_addr, size };
                 regions.push(MmioPeripheral {

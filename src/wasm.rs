@@ -68,33 +68,36 @@ where
         initialize_module_functions: fn(&mut Linker<T>),
         name: &'static str,
     ) -> Self {
-        let engine = ENGINE.get().unwrap();
+        let engine = ENGINE
+            .get()
+            .expect("[FATAL][MODULES]: wasmi engine didn't initialize");
         let mut store = Store::new(engine, store_value.clone());
 
         // Create a Module struct from the raw .wasm data.
-        let module = unsafe { Module::new_unchecked(engine, wasm) };
+        let module = unsafe {
+            Module::new_unchecked(engine, wasm)
+                .expect(
+                    "[FATAL][MODULES]: failed to create wasmi::Module: most likely it is '{name}' fails"
+                )
+        };
 
         let mut linker = <Linker<T>>::new(engine);
         initialize_module_functions(&mut linker);
 
         let instance = linker
-            .instantiate_and_start(&mut store, module.as_ref().unwrap())
-            .unwrap();
+            .instantiate_and_start(&mut store, &module)
+            .expect("[FATAL][MODULES]: failed to create an instance");
 
-        let spare_wasm_module = if let Some(data) = spare_wasm_module_data {
-            Some(
-                WasmModule::new(
-                    data,
-                    store_value.clone(),
-                    None,
-                    initialize_module_functions,
-                    name,
-                )
-                .into_spare_wasm_module(false),
+        let spare_wasm_module = spare_wasm_module_data.map(|data| {
+            WasmModule::new(
+                data,
+                store_value.clone(),
+                None,
+                initialize_module_functions,
+                name,
             )
-        } else {
-            None
-        };
+            .into_spare_wasm_module(false)
+        });
 
         Self {
             name,
@@ -103,7 +106,7 @@ where
             panic_count: 0,
             standard_store_value: store_value,
             linker,
-            module: module.unwrap(),
+            module,
             spare_wasm_module,
         }
     }
@@ -119,9 +122,10 @@ where
         }
     }
     fn switch_with_spare_module(mut self) -> Self {
-        let spare_module = self.spare_wasm_module.take().unwrap();
-
         let module_name = self.name;
+        let spare_module = self.spare_wasm_module.take().expect(
+            "[CRITICAL][MODULES]: module that should have a spare, does not have such, module is destroyed"
+        );
 
         let switched_module = self.into_spare_wasm_module(true);
         spare_module.into_wasm_module(Some(switched_module), module_name)
@@ -132,7 +136,7 @@ where
             // At the first panic of the module, simply reset its Store.
             0 => {
                 crate::println!(
-                    "\n[WARN][MODULES]: {} module '{}' panicked (1/3): {cause}",
+                    "[WARN][MODULES]: {} module '{}' panicked (1/3): {cause}",
                     self.spare_prefix(),
                     self.name
                 );
@@ -144,7 +148,7 @@ where
             // At the second - reset its Instance and Store.
             1 => {
                 crate::println!(
-                    "\n[WARN][MODULES]: {} module '{}' panicked (2/3): {cause}",
+                    "[WARN][MODULES]: {} module '{}' panicked (2/3): {cause}",
                     self.spare_prefix(),
                     self.name
                 );
@@ -196,9 +200,14 @@ where
         let mut store = &mut self.store;
 
         let old_instance = &mut self.instance;
-        let instance = self.linker.instantiate_and_start(&mut store, &self.module);
+        let instance = self
+            .linker
+            .instantiate_and_start(&mut store, &self.module)
+            .expect(
+                "[CRITICAL][MODULES]: failed to create an instance, while resetting it on the module panic, module is destroyed"
+            );
 
-        *old_instance = instance.unwrap();
+        *old_instance = instance;
     }
     fn spare_prefix(&self) -> &'static str {
         if let Some(ref spare) = self.spare_wasm_module
@@ -251,7 +260,7 @@ fn init_claim_guest_module(linker: &mut Linker<u32>) {
                 crate::guest::claim_vcpu_for_hart_if_available(guest_id as usize) as u32
             },
         )
-        .unwrap();
+        .expect("[FATAL][MODULES]: failed to wrap a function");
 }
 
 fn init_claim_assigned_guest_module(linker: &mut Linker<u32>) {
@@ -263,7 +272,7 @@ fn init_claim_assigned_guest_module(linker: &mut Linker<u32>) {
                 crate::guest::claim_assigned_hart_slot_if_available(guest_id as usize) as u32
             },
         )
-        .unwrap();
+        .expect("[FATAL][MODULES]: failed to wrap a function");
 }
 
 pub struct Modules;
@@ -274,13 +283,15 @@ impl Modules {
 
         // Subsequent loop iterations restore the module if it will panic.
         loop {
-            let mut module: WasmModule<u32> = module_lock.take().unwrap();
+            let mut module: WasmModule<u32> = module_lock
+                .take()
+                .expect("[CRITICAL][MODULES]: failed to move module from the Mutex lock");
             let instance = module.instance;
             let mut store = &mut module.store;
 
             let function = instance
                 .get_typed_func::<u32, u32>(&store, module.name)
-                .unwrap();
+                .expect("[CRITICAL][MODULES]: failed to get a typed function");
 
             let result = function.call(&mut store, guest_id as u32);
 
@@ -295,18 +306,22 @@ impl Modules {
             }
         }
     }
+
     pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
         let mut module_lock = CLAIM_ASSIGNED_GUEST_MODULE.lock();
 
         // Subsequent loop iterations restore the module if it will panic.
         loop {
-            let mut module: WasmModule<u32> = module_lock.take().unwrap();
+            let mut module: WasmModule<u32> = module_lock
+                .take()
+                .expect("[CRITICAL][MODULES]: failed to move module from the Mutex lock");
+
             let instance = &mut module.instance;
             let store = &mut module.store;
 
             let function = instance
                 .get_typed_func::<(u32, u32), u32>(&*store, module.name)
-                .unwrap();
+                .expect("[CRITICAL][MODULES]: failed to get a typed function from the ");
 
             let result = function.call(&mut *store, (guest_id as u32, hart_id as u32));
 

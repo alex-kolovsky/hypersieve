@@ -7,7 +7,9 @@ pub fn generate_hart_abi_constants(
 ) {
     // Create the file path for the hart constants.
     let hart_abi_constants_file_path = std::path::Path::new(out_dir).join("hart_abi_constants.rs");
-    let mut hart_abi_constants_file = std::fs::File::create(hart_abi_constants_file_path).unwrap();
+
+    let mut hart_abi_constants_file = std::fs::File::create(hart_abi_constants_file_path)
+        .expect("[FATAL][BUILD]: failed to create a file");
 
     let mut max_supported_assigned_guests_per_hart = 0;
 
@@ -25,16 +27,23 @@ pub const TOTAL_HART_CAPACITY: usize = {total_hart_capacity};
 pub const ASSIGNED_GUESTS_BY_HART_ID:
     [[Option<usize>; MAX_SUPPORTED_ASSIGNED_GUESTS_PER_HART]; TOTAL_HART_CAPACITY] = ["
     )
-    .unwrap();
+    .expect("[FATAL][BUILD]: failed to perform a write to the file");
+
     for hart in harts {
-        writeln!(hart_abi_constants_file, "[").unwrap();
+        writeln!(hart_abi_constants_file, "[")
+            .expect("[FATAL][BUILD]: failed to perform a write to the file");
+
         for guest_id in &hart.guests {
-            writeln!(hart_abi_constants_file, "{guest_id:#?},").unwrap();
+            writeln!(hart_abi_constants_file, "{guest_id:#?},")
+                .expect("[FATAL][BUILD]: failed to perform a write to the file");
         }
         for _ in 0..(max_supported_assigned_guests_per_hart - hart.guests.len()) {
-            writeln!(hart_abi_constants_file, "None,").unwrap();
+            writeln!(hart_abi_constants_file, "None,")
+                .expect("[FATAL][BUILD]: failed to perform a write to the file");
         }
-        writeln!(hart_abi_constants_file, "],").unwrap();
+        writeln!(hart_abi_constants_file, "],")
+            .expect("[FATAL][BUILD]: failed to perform a write to the file");
     }
-    writeln!(hart_abi_constants_file, "];").unwrap();
+    writeln!(hart_abi_constants_file, "];")
+        .expect("[FATAL][BUILD]: failed to perform a write to the file");
 }

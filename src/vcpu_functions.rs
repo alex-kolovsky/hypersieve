@@ -36,7 +36,9 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
             crate::wasm::Modules::claim_assigned_guest(current_guest_id_for_hart, host_hart_id)
                 as usize;
         let vcpu_ptrs = unsafe { &mut *hart.assigned_guest_vcpus.get() };
-        next_guest_vcpu = vcpu_ptrs[local_guest_id].take().unwrap();
+        next_guest_vcpu = vcpu_ptrs[local_guest_id]
+            .take()
+            .expect("[CRITICAL][GUEST_SWITCH]: failed to take an assigned vcpu pointer");
         local_guest_id
     } else {
         // If a hart is not assigned, release this vcpu from the global Guest struct.
@@ -77,7 +79,9 @@ pub fn run_next_guest(cur_vcpu_ref: &'static mut dyn VcpuInterface) {
 
 pub fn get_global_vcpu_ptr(guest: &crate::guest::Guest) -> &mut dyn VcpuInterface {
     let mut vcpu_ptrs = guest.vcpu_ptrs.lock();
-    let vcpu_ptr = vcpu_ptrs[0].take().unwrap();
+    let vcpu_ptr = vcpu_ptrs[0]
+        .take()
+        .expect("[CRITICAL][GUEST_SWITCH]: failed to take a vcpu pointer");
     vcpu_ptrs[0] = None;
     vcpu_ptrs.rotate_left(1);
     drop(vcpu_ptrs);

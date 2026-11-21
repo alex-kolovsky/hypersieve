@@ -17,7 +17,7 @@ pub fn get_properties(
         .property("vlen")
         .expect("[FATAL][CONFIG]: no vlen property in DTS")
         .as_usize()
-        .unwrap();
+        .expect("[FATAL][CONFIG]: failed to parse vlen field into usize");
 
     if vlen > target_arch_features.max_vlen {
         target_arch_features.max_vlen = vlen;
