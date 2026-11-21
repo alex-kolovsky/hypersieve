@@ -13,14 +13,20 @@ pub fn get_properties(
 ) {
     // Sets VLEN and FP parameters for RISC-V 64 targets; defaults to zero/false otherwise.
     // Extract the vector length (VLEN).
-    let vlen = guest_node
-        .property("vlen")
-        .expect("[FATAL][CONFIG]: no vlen property in DTS")
-        .as_usize()
-        .expect("[FATAL][CONFIG]: failed to parse vlen field into usize");
+    let vlen_opt = guest_node.property("vlen");
 
-    if vlen > target_arch_features.max_vlen {
-        target_arch_features.max_vlen = vlen;
+    if let Some(vlen) = vlen_opt {
+        let vlen = vlen
+            .as_usize()
+            .expect("[FATAL][CONFIG]: failed to parse vlen field into usize");
+
+        if vlen > target_arch_features.max_vlen {
+            target_arch_features.max_vlen = vlen;
+        }
+
+        target_arch_guest_features.vlen = vlen;
+    } else {
+        target_arch_guest_features.vlen = 0;
     }
 
     let fp = guest_node.property("floating-point-extension").is_some();
@@ -29,6 +35,5 @@ pub fn get_properties(
         target_arch_features.is_fp_needed = true;
     }
 
-    target_arch_guest_features.vlen = vlen;
     target_arch_guest_features.fp = fp;
 }
