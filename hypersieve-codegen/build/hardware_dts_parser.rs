@@ -24,6 +24,25 @@ impl MemoryRegion {
             size: 0x0,
         }
     }
+    pub fn vec_from_raw_array(array: &[u8]) -> Vec<Self> {
+        let mut v: Vec<Self> = Vec::new();
+
+        let (chunks, _remainder) = array.as_chunks::<8>();
+
+        for bytes in chunks.chunks(2) {
+            let base_addr: u64 = u64::from_be_bytes(bytes[0]);
+            let size: u64 = u64::from_be_bytes(bytes[1]);
+
+            // Panic if the memory address sum overflows.
+            base_addr
+                .checked_add(size)
+                .expect("[FATAL][CONFIG]: memory address sum (base_addr + size) overflows");
+
+            v.push(MemoryRegion { base_addr, size });
+        }
+
+        v
+    }
 }
 #[derive(Debug, Clone)]
 pub struct MmioPeripheral {

@@ -10,7 +10,15 @@
         // The greater the number of such windows, the slower the hypervisor becomes.
         // Elements 0-1: MMIO base address (0x00000000_00000000)
         // Elements 2-3: Size (0x00000000_70000000)
-     	mmio-windows = <0x0 0x0 0x0 0x70000000 0xF0000000 0x0 0x0FFFFFFF 0xFFFFFFFF>;
+        //              |base address| |    size    | |base address| |        size       |
+        mmio-windows = <0x0 0x10000000 0x0 0x70000000 0xF0000000 0x0 0x0FFFFFFF 0xFFFFFFFF>;
+
+        // All shared buffer regions in the system.
+        // Buffer can be shared only accross two guests with different policies.
+        // Elements 0-1: MMIO base address (0x00000000_00000000)
+        // Elements 2-3: Size (0x00000000_70000000)
+        // Region IDs:   |    buffer ID 1    | |    buffer ID 2    |
+        shared-buffers = <0x0 0x4200 0x0 0x1000 0x0 0x6200 0x0 0x1000>;
 
         // Configuration for the first guest VM.
         vm0 {
@@ -39,6 +47,11 @@
             // If the base address and the size are not Page-Aligned, accessing them will be significantly slower.
             allowed-mmio = <0x0 0x10000000 0x0 0x1 0xFFFFFFFF 0xDEADBEEF 0x0 0x1>;
 
+            // ID of regions that are shared to this guest.
+            // Notice that you can't share regions that are overlap.
+            allowed-to-write-shared-buffers = <1>;
+            allowed-to-read-shared-buffers = <0>;
+
             // Virtual address of the guest entry.
             entry = <0x0 0x0>;
         };
@@ -48,6 +61,9 @@
             // Enables the floating-point extension;
             // comment out or delete this parameter to disable it.
             floating-point-extension;
+
+            allowed-to-read-shared-buffers = <1>;
+            allowed-to-write-shared-buffers = <0>;
 
             path = "target/guest-2/guest-2.bin";
 

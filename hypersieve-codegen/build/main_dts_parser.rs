@@ -24,6 +24,14 @@ pub struct HypervisorConfiguration {
     pub target_arch_features: TargetArchFeatures,
 
     pub system_mmio_windows: Vec<MemoryRegion>,
+    pub shared_buffers: Vec<SharedBuffer>,
+}
+
+#[derive(Debug)]
+pub struct SharedBuffer {
+    pub region: MemoryRegion,
+    pub is_read_taken: bool,
+    pub is_write_taken: bool,
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
@@ -78,9 +86,11 @@ pub fn parse_dts(
 
     let mut target_arch_features: TargetArchFeatures = Default::default();
 
-    let mut system_mmio_windows: Vec<MemoryRegion> = Vec::new();
+    let system_mmio_windows: Vec<MemoryRegion>;
 
     let mut guests: Vec<Guest> = Vec::new();
+
+    let mut shared_buffers: Vec<SharedBuffer> = Vec::new();
 
     let fdt =
         fdt::Fdt::new(&dtb_data).expect("[FATAL][BUILD]: failed to parse DT file into Fdt struct");
@@ -90,19 +100,24 @@ pub fn parse_dts(
             .property("mmio-windows")
             .expect("[FATAL][CONFIG]: no mmio-windows property in DTS")
             .value;
-        let (chunks, _remainder) = system_mmio_windows_raw.as_chunks::<8>();
 
-        for bytes in chunks.chunks(2) {
-            let base_addr: u64 = u64::from_be_bytes(bytes[0]);
-            let size: u64 = u64::from_be_bytes(bytes[1]);
+        system_mmio_windows = MemoryRegion::vec_from_raw_array(system_mmio_windows_raw);
 
-            // Panic if the memory address sum overflows.
-            base_addr
-                .checked_add(size)
-                .expect("[FATAL][CONFIG]: memory address sum (base_addr + size) overflows");
+        let shared_buffers_raw = hypervisor
+            .property("shared-buffers")
+            .expect("[FATAL][CONFIG]: no shared-buffers property in DTS")
+            .value;
 
-            system_mmio_windows.push(MemoryRegion { base_addr, size });
-        }
+        let regions = MemoryRegion::vec_from_raw_array(shared_buffers_raw);
+        shared_buffers = regions
+            .iter()
+            .map(|region| SharedBuffer {
+                region: region.clone(),
+                is_read_taken: false,
+                is_write_taken: false,
+            })
+            .collect();
+        shared_buffers.sort_by_key(|buffer| buffer.region.base_addr);
 
         for guest in hypervisor.children() {
             let mut target_arch_guest_features = TargetArchGuestFeatures::default();
@@ -141,11 +156,12 @@ pub fn parse_dts(
                 base_addr
                     .checked_add(size)
                     .expect("[FATAL][CONFIG]: memory address sum (base_addr + size) overflows");
+
                 let is_in_window = system_mmio_windows
                     .binary_search_by(|region| {
                         if base_addr < region.base_addr {
                             Ordering::Greater
-                        } else if base_addr > region.base_addr + region.size {
+                        } else if base_addr > region.end_addr() {
                             Ordering::Less
                         } else {
                             Ordering::Equal
@@ -160,6 +176,70 @@ pub fn parse_dts(
                         "[FATAL][CONFIG]: allowed MMIO address {base_addr:#x} falls outside of system MMIO windows"
                     );
                 }
+            }
+
+            let allowed_to_write_shared_buffers: Option<Vec<u32>>;
+            if let Some(allowed_to_write_shared_buffers_raw) =
+                guest.property("allowed-to-write-shared-buffers")
+            {
+                let mut allowed_to_write_shared_buffers_vec: Vec<u32> = Vec::new();
+
+                let (chunks, _remainder) =
+                    allowed_to_write_shared_buffers_raw.value.as_chunks::<4>();
+
+                for bytes in chunks.iter() {
+                    let allowed_to_write_shared_buffer_region_id: u32 = u32::from_be_bytes(*bytes);
+
+                    // Ensure that buffer is allowed to write only for one guest.
+                    if shared_buffers[allowed_to_write_shared_buffer_region_id as usize]
+                        .is_write_taken
+                    {
+                        panic!(
+                            "[FATAL][CONFIG]: buffer cannot be allowed to write for more than one guest"
+                        )
+                    }
+
+                    shared_buffers[allowed_to_write_shared_buffer_region_id as usize]
+                        .is_write_taken = true;
+
+                    allowed_to_write_shared_buffers_vec
+                        .push(allowed_to_write_shared_buffer_region_id);
+                }
+                allowed_to_write_shared_buffers = Some(allowed_to_write_shared_buffers_vec);
+            } else {
+                allowed_to_write_shared_buffers = None;
+            }
+
+            let allowed_to_read_shared_buffers: Option<Vec<u32>>;
+            if let Some(allowed_to_read_shared_buffers_raw) =
+                guest.property("allowed-to-read-shared-buffers")
+            {
+                let mut allowed_to_read_shared_buffers_vec: Vec<u32> = Vec::new();
+
+                let (chunks, _remainder) =
+                    allowed_to_read_shared_buffers_raw.value.as_chunks::<4>();
+
+                for bytes in chunks.iter() {
+                    let allowed_to_read_shared_buffer_region_id: u32 = u32::from_be_bytes(*bytes);
+
+                    // Ensure that buffer is allowed to read only for one guest.
+                    if shared_buffers[allowed_to_read_shared_buffer_region_id as usize]
+                        .is_read_taken
+                    {
+                        panic!(
+                            "[FATAL][CONFIG]: buffer cannot be allowed to read for more than one guest"
+                        )
+                    }
+
+                    shared_buffers[allowed_to_read_shared_buffer_region_id as usize]
+                        .is_read_taken = true;
+
+                    allowed_to_read_shared_buffers_vec
+                        .push(allowed_to_read_shared_buffer_region_id);
+                }
+                allowed_to_read_shared_buffers = Some(allowed_to_read_shared_buffers_vec);
+            } else {
+                allowed_to_read_shared_buffers = None;
             }
 
             let path = format!(
@@ -235,6 +315,8 @@ pub fn parse_dts(
                     path,
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
+                    allowed_to_write_shared_buffers,
+                    allowed_to_read_shared_buffers,
                     target_arch_guest_features,
                 };
 
@@ -245,6 +327,8 @@ pub fn parse_dts(
                     hart_capacity,
                     assigned_harts: Vec::new(),
                     path,
+                    allowed_to_write_shared_buffers,
+                    allowed_to_read_shared_buffers,
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
                     target_arch_guest_features,
@@ -282,6 +366,7 @@ pub fn parse_dts(
         total_hart_capacity,
         target_arch_features,
         system_mmio_windows,
+        shared_buffers,
     }
 }
 

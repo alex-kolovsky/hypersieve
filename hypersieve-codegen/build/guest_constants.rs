@@ -2,7 +2,7 @@ use crate::{
     TargetArch,
     build_modules::{
         hardware_dts_parser::{MemoryRegion, MmioPeripheral},
-        main_dts_parser::HypervisorConfiguration,
+        main_dts_parser::{HypervisorConfiguration, SharedBuffer},
     },
 };
 use std::io::Write;
@@ -148,6 +148,27 @@ pub static GUESTS: [Guest; {}] = [
             &mut guest.target_arch_guest_features,
             &mut guest_specific_routines_file,
         );
+
+        if let Some(ref allowed_to_write_shared_buffers_vec) = guest.allowed_to_write_shared_buffers
+        {
+            let mut all_allowed_shared_buffers_vec = Vec::new();
+            all_allowed_shared_buffers_vec.extend(allowed_to_write_shared_buffers_vec);
+
+            if let Some(ref allowed_to_read_shared_buffers_vec) =
+                guest.allowed_to_read_shared_buffers
+            {
+                all_allowed_shared_buffers_vec.extend(allowed_to_read_shared_buffers_vec);
+            }
+
+            all_allowed_shared_buffers_vec.sort();
+
+            // Check if allowed to the guest shared buffer regions overlaps.
+            detect_buffer_overlaps(
+                &hypervisor_configuration.shared_buffers,
+                &all_allowed_shared_buffers_vec,
+            );
+        }
+
         // Create guest.vcpus array.
         let mut vcpus: String = String::from("[");
         vcpus.push_str(
@@ -237,4 +258,22 @@ pub static GUESTS: [Guest; {}] = [
 
     writeln!(guest_constants_file, "];")
         .expect("[FATAL][BUILD]: failed to perform a write to the file");
+}
+
+fn detect_buffer_overlaps(buffers: &[SharedBuffer], ids: &[u32]) {
+    for id in 0..ids.len() {
+        if (id + 1) >= ids.len() {
+            break;
+        }
+
+        let region = buffers[ids[id] as usize].region;
+        let next_region = buffers[ids[id + 1] as usize].region;
+
+        if region.end_addr() >= next_region.base_addr && region.base_addr <= next_region.end_addr()
+        {
+            panic!(
+                "[FATAL][BUILD]: allowed to the guest regions overlaps: '{region:#?}' and '{next_region:#?}'"
+            );
+        }
+    }
 }

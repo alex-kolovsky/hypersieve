@@ -35,12 +35,14 @@ struct Guest {
     aligned_passthrough_mmio_regions: Vec<MemoryRegion>,
     allowed_mmio_peripherals: Vec<MmioPeripheral>,
     target_arch_guest_features: TargetArchGuestFeatures,
+    allowed_to_write_shared_buffers: Option<Vec<u32>>,
+    allowed_to_read_shared_buffers: Option<Vec<u32>>,
 }
 
 #[derive(Debug, Default)]
 pub struct Hart {
-    pub hart_id: usize,
-    pub guests: Vec<Option<usize>>,
+    hart_id: usize,
+    guests: Vec<Option<usize>>,
 }
 
 pub struct TargetArch {
