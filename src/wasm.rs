@@ -8,7 +8,6 @@ where
     name: &'static str,
     instance: Instance,
     store: Store<T>,
-    panic_count: u8,
     standard_store_value: T,
     linker: Linker<T>,
     module: Module,
@@ -48,7 +47,6 @@ where
             name,
             instance: self.instance,
             store: self.store,
-            panic_count: 0,
             standard_store_value: self.standard_store_value,
             linker: self.linker,
             module: self.module,
@@ -103,7 +101,6 @@ where
             name,
             instance,
             store,
-            panic_count: 0,
             standard_store_value: store_value,
             linker,
             module,
@@ -131,8 +128,8 @@ where
         spare_module.into_wasm_module(Some(switched_module), module_name)
     }
 
-    fn recover(mut self, cause: wasmi::Error) -> Self {
-        match self.panic_count {
+    fn recover(mut self, panic_count: usize, cause: wasmi::Error) -> Self {
+        match panic_count {
             // At the first panic of the module, simply reset its Store.
             0 => {
                 crate::println!(
@@ -140,7 +137,6 @@ where
                     self.spare_prefix(),
                     self.name
                 );
-                self.panic_count += 1;
 
                 self.reset_store();
                 self
@@ -152,7 +148,6 @@ where
                     self.spare_prefix(),
                     self.name
                 );
-                self.panic_count += 1;
 
                 self.reset_instance();
                 self
@@ -282,6 +277,7 @@ impl Modules {
     pub fn claim_guest(guest_id: usize) -> u32 {
         let mut module_lock = CLAIM_GUEST_MODULE.lock();
 
+        let mut panic_count = 0;
         // Subsequent loop iterations restore the module if it will panic.
         loop {
             let mut module: WasmModule<u32> = module_lock
@@ -302,7 +298,8 @@ impl Modules {
                 drop(module_lock);
                 return guest_id;
             } else if let Err(cause) = result {
-                *module_lock = Some(module.recover(cause));
+                *module_lock = Some(module.recover(panic_count, cause));
+                panic_count += 1;
                 continue;
             }
         }
@@ -311,6 +308,7 @@ impl Modules {
     pub fn claim_assigned_guest(guest_id: usize, hart_id: usize) -> u32 {
         let mut module_lock = CLAIM_ASSIGNED_GUEST_MODULE.lock();
 
+        let mut panic_count = 0;
         // Subsequent loop iterations restore the module if it will panic.
         loop {
             let mut module: WasmModule<u32> = module_lock
@@ -332,7 +330,8 @@ impl Modules {
                 drop(module_lock);
                 return local_guest_id;
             } else if let Err(cause) = result {
-                *module_lock = Some(module.recover(cause));
+                *module_lock = Some(module.recover(panic_count, cause));
+                panic_count += 1;
                 continue;
             }
         }

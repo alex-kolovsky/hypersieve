@@ -1,6 +1,6 @@
 # Hypersieve
 
-A bare-metal type 1 Hypervisor written from scratch in Rust
+A bare-metal type-1 microhypervisor with WebAssembly modules, written from scratch in Rust.
 
 ## Getting Started
 
@@ -53,7 +53,7 @@ All of these test scenarios are pre-configured in the aforementioned configurati
 Detailed instructions and rules for making custom modifications
 are specified directly within the configuration files themselves.
 
-To learn more about modifying configuration files, visit the [official documentation](https://kolovsky.me/hypersieve)
+To learn more about modifying configuration files, please visit the [official documentation](https://kolovsky.me/hypersieve).
 
 ## License
 
