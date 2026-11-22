@@ -1,24 +1,32 @@
 ENTRY(_start)
-MEMORY {
-  HYP_MEM (rwx) : ORIGIN = 0x80200000, LENGTH = 128M
+
+PHDRS {
+  text PT_LOAD FLAGS(5);
+  rodata PT_LOAD FLAGS(4);
+  data PT_LOAD FLAGS(6);
+  bss PT_LOAD FLAGS(6);
+  stack PT_LOAD FLAGS(6);
+  heap PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
+  . = 0x80200000;
+
   .text : ALIGN(8) {
-    KEEP(*(.init));
-    *(.text .text.*);
-    . = ALIGN(8);
-    *(.stvec);
-  } > HYP_MEM
+      KEEP(*(.init));
+      *(.text .text.*);
+      . = ALIGN(8);
+      *(.stvec);
+  } : text
 
   .rodata : ALIGN(8) {
     *(.rodata .rodata.*);
-  } > HYP_MEM
+  } : rodata
 
   .data : ALIGN(8) {
     *(.data .data.*);
     *(.sdata .sdata.*)
-  } > HYP_MEM
+  } : data
 
   .bss (NOLOAD) : ALIGN(8) {
     __bss_start = .;
@@ -26,19 +34,19 @@ SECTIONS {
     *(.sbss .sbss.*);
     . = ALIGN(8);
     __bss_end = .;
-  } > HYP_MEM
+  } : bss
 
   .stack (NOLOAD) : ALIGN(16) {
     __stack_start = .;
     . += 1024 * 1024; /* 1 MiB */
     __stack_end = .;
-  } > HYP_MEM
+  } : stack
 
   .heap (NOLOAD) : ALIGN(4096) {
     __heap_start = .;
     . += 64 * 1024 * 1024; /* 64 MiB */
     __heap_end = .;
-  } > HYP_MEM
+  } : heap
 
   /DISCARD/ : {
     *(.eh_frame);
