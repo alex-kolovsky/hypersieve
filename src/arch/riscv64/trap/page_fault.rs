@@ -25,10 +25,11 @@ pub fn handle_load_store_page_fault(vcpu_ref: &mut Vcpu, exception_code: u64) {
 
     // If the address is in the system MMIO window, process it; otherwise, allocate a page.
     let is_mmio = crate::SYSTEM_MMIO_WINDOWS
-        .binary_search_by(|region| {
-            if requested_guest_addr < region.base_addr {
+        .binary_search_by(|mmio_region| {
+            if requested_guest_addr < mmio_region.region.base_addr {
                 Ordering::Greater
-            } else if requested_guest_addr > region.base_addr + region.size {
+            } else if requested_guest_addr > mmio_region.region.base_addr + mmio_region.region.size
+            {
                 Ordering::Less
             } else {
                 Ordering::Equal
@@ -63,10 +64,11 @@ fn process_mmio(vcpu_ref: &mut Vcpu, requested_guest_addr: u64, current_guest: &
     // If this is an allowed MMIO address, perform a write to it; otherwise, throw an exception to the guest.
     let search_result = current_guest
         .allowed_mmio_memory_region
-        .binary_search_by(|region| {
-            if requested_guest_addr < region.base_addr {
+        .binary_search_by(|mmio_region| {
+            if requested_guest_addr < mmio_region.region.base_addr {
                 Ordering::Greater
-            } else if requested_guest_addr > region.base_addr + region.size {
+            } else if requested_guest_addr > mmio_region.region.base_addr + mmio_region.region.size
+            {
                 Ordering::Less
             } else {
                 Ordering::Equal
@@ -175,8 +177,12 @@ fn handle_scalar_instruction(
     let size = 1 << width_field;
 
     // Inject a guest exception if the requested access overflows the MMIO region boundaries.
-    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id].base_addr
-        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id].size)
+    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id]
+        .region
+        .base_addr
+        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id]
+            .region
+            .size)
         - requested_guest_addr;
 
     // Match the 7-bit opcode to determine the register file type (GPR vs. FPR)
@@ -303,8 +309,12 @@ fn handle_vector_instruction(
     };
 
     // Inject a guest exception if the requested access overflows the MMIO region boundaries.
-    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id].base_addr
-        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id].size)
+    let max_size = (current_guest.allowed_mmio_memory_region[passthrough_mmio_id]
+        .region
+        .base_addr
+        + current_guest.allowed_mmio_memory_region[passthrough_mmio_id]
+            .region
+            .size)
         - requested_guest_addr;
 
     let opcode = inst & 0x7F;

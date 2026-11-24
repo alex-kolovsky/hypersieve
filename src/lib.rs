@@ -26,9 +26,9 @@ pub fn run(hart_id: usize) -> ! {
     arch::uart::global_uart_init();
     allocator::init_heap();
 
-    guest::initialize_guests();
-
     HartFunctions::hart_configure();
+
+    guest::initialize_guests();
 
     wasm::init_engine();
     wasm::init_wasm_modules();

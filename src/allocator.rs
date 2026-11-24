@@ -10,9 +10,10 @@ unsafe extern "C" {
     pub static __heap_end: u8;
 }
 
-pub fn alloc_pages(len: usize) -> *mut u8 {
-    let aligned_len = (len + 4095) & !4095;
-    let layout = core::alloc::Layout::from_size_align(aligned_len, 4096)
+pub fn alloc_pages(len: usize, align_kibs: usize) -> *mut u8 {
+    let align = align_kibs * 1024;
+    let aligned_len = (len + (align - 1)) & !(align - 1);
+    let layout = core::alloc::Layout::from_size_align(aligned_len, align)
         .expect("[FATAL][ALLOCATOR]: invalid layout parameters");
     unsafe { ALLOCATOR.alloc_zeroed(layout) }
 }

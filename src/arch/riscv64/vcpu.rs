@@ -150,7 +150,7 @@ impl crate::arch::VcpuInterface for Vcpu {
 
         // Set harts stack size.
         let stack_size = 512 * 1024;
-        let host_sp: u64 = crate::allocator::alloc_pages(stack_size) as u64 + stack_size as u64;
+        let host_sp: u64 = crate::allocator::alloc_pages(stack_size, 4) as u64 + stack_size as u64;
 
         // Set the a0 register to the virtual hart ID.
         let mut gprs = [0; 32];
@@ -210,8 +210,12 @@ impl crate::arch::VcpuInterface for Vcpu {
 
         // Initialize aligned MMIO addresses.
         for mmio_region in &guest.aligned_passthrough_mmio_regions {
-            if mmio_region.base_addr != 0 {
-                page_table.map(mmio_region.base_addr, mmio_region.base_addr, PTE_R | PTE_W);
+            if mmio_region.region.base_addr != 0 {
+                page_table.map(
+                    mmio_region.region.base_addr,
+                    mmio_region.region.base_addr,
+                    PTE_R | PTE_W,
+                );
             }
         }
 

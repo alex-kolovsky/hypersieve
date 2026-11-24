@@ -27,11 +27,35 @@ pub struct HypervisorConfiguration {
     pub shared_buffers: Vec<SharedBuffer>,
 }
 
-#[derive(Debug)]
 pub struct SharedBuffer {
     pub region: MemoryRegion,
-    pub is_read_taken: bool,
-    pub is_write_taken: bool,
+    pub reader_guest_id: Option<usize>,
+    pub writer_guest_id: Option<usize>,
+}
+
+// Custom Debug implementation to print guest IDs without the Option object.
+impl core::fmt::Debug for SharedBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedBuffer")
+            .field("region", &format_args!("{:#?}", self.region))
+            .field(
+                "writer_guest_id",
+                &format_args!(
+                    "{}",
+                    self.writer_guest_id
+                        .expect("[FATAL][CONFIG]: shared buffer cannot be own by only one guest")
+                ),
+            )
+            .field(
+                "reader_guest_id",
+                &format_args!(
+                    "{}",
+                    self.reader_guest_id
+                        .expect("[FATAL][CONFIG]: shared buffer cannot be own by only one guest")
+                ),
+            )
+            .finish()
+    }
 }
 
 pub fn compile_dts(dtb_output_path: &std::path::PathBuf, dts_source_path: &str) {
@@ -90,7 +114,7 @@ pub fn parse_dts(
 
     let mut guests: Vec<Guest> = Vec::new();
 
-    let mut shared_buffers: Vec<SharedBuffer> = Vec::new();
+    let mut shared_buffers: Vec<SharedBuffer>;
 
     let fdt =
         fdt::Fdt::new(&dtb_data).expect("[FATAL][BUILD]: failed to parse DT file into Fdt struct");
@@ -111,15 +135,23 @@ pub fn parse_dts(
         let regions = MemoryRegion::vec_from_raw_array(shared_buffers_raw);
         shared_buffers = regions
             .iter()
-            .map(|region| SharedBuffer {
-                region: region.clone(),
-                is_read_taken: false,
-                is_write_taken: false,
+            .map(|region| {
+                if region.is_aligned() {
+                    SharedBuffer {
+                        region: *region,
+                        reader_guest_id: None,
+                        writer_guest_id: None,
+                    }
+                } else {
+                    panic!(
+                        "[FATAL][CONFIG]: shared buffer region is not page-aligned: {region:#?}"
+                    );
+                }
             })
             .collect();
         shared_buffers.sort_by_key(|buffer| buffer.region.base_addr);
 
-        for guest in hypervisor.children() {
+        for (guest_id, guest) in hypervisor.children().enumerate() {
             let mut target_arch_guest_features = TargetArchGuestFeatures::default();
             // Extract the VM entry address.
             let entry_gpa = guest
@@ -192,7 +224,8 @@ pub fn parse_dts(
 
                     // Ensure that buffer is allowed to write only for one guest.
                     if shared_buffers[allowed_to_write_shared_buffer_region_id as usize]
-                        .is_write_taken
+                        .writer_guest_id
+                        .is_some()
                     {
                         panic!(
                             "[FATAL][CONFIG]: buffer cannot be allowed to write for more than one guest"
@@ -200,7 +233,7 @@ pub fn parse_dts(
                     }
 
                     shared_buffers[allowed_to_write_shared_buffer_region_id as usize]
-                        .is_write_taken = true;
+                        .writer_guest_id = Some(guest_id);
 
                     allowed_to_write_shared_buffers_vec
                         .push(allowed_to_write_shared_buffer_region_id);
@@ -209,7 +242,6 @@ pub fn parse_dts(
             } else {
                 allowed_to_write_shared_buffers = None;
             }
-
             let allowed_to_read_shared_buffers: Option<Vec<u32>>;
             if let Some(allowed_to_read_shared_buffers_raw) =
                 guest.property("allowed-to-read-shared-buffers")
@@ -224,7 +256,8 @@ pub fn parse_dts(
 
                     // Ensure that buffer is allowed to read only for one guest.
                     if shared_buffers[allowed_to_read_shared_buffer_region_id as usize]
-                        .is_read_taken
+                        .reader_guest_id
+                        .is_some()
                     {
                         panic!(
                             "[FATAL][CONFIG]: buffer cannot be allowed to read for more than one guest"
@@ -232,11 +265,12 @@ pub fn parse_dts(
                     }
 
                     shared_buffers[allowed_to_read_shared_buffer_region_id as usize]
-                        .is_read_taken = true;
+                        .reader_guest_id = Some(guest_id);
 
                     allowed_to_read_shared_buffers_vec
                         .push(allowed_to_read_shared_buffer_region_id);
                 }
+
                 allowed_to_read_shared_buffers = Some(allowed_to_read_shared_buffers_vec);
             } else {
                 allowed_to_read_shared_buffers = None;

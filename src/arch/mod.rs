@@ -47,4 +47,7 @@ pub trait HartInterface {
 
 pub trait GuestPageTableInterface {
     fn map_kernel(guest_entry_gpa: usize, kernel_memory: *mut u8) -> GuestPageTable;
+    fn read_flag() -> usize;
+    fn write_flag() -> usize;
+    fn execute_flag() -> usize;
 }

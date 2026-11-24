@@ -2,19 +2,30 @@ use hypersieve_abi::GuestInfo;
 
 use crate::{
     GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_ALLOWED_MMIO_REGIONS_COUNT,
-    MAX_SUPPORTED_HARTS_PER_GUEST,
+    MAX_SUPPORTED_HARTS_PER_GUEST, SHARED_BUFFERS,
     allocator::alloc_pages,
     arch::{GuestPageTableFunctions, GuestPageTableInterface, Vcpu, VcpuInterface},
 };
 use core::{cell::UnsafeCell, sync::atomic::Ordering};
 
 #[derive(Debug)]
-pub struct MmioMemoryRegion {
+pub struct MemoryRegion {
     pub base_addr: u64,
     pub size: u64,
+}
 
+#[derive(Debug)]
+pub struct MmioMemoryRegion {
+    pub region: MemoryRegion,
     // The 'emulation_fn' is a pointer to the handler responsible for emulating access to this region.
     pub emulation_fn: Option<fn(crate::arch::PageFaultInfo)>,
+}
+
+#[derive(Debug)]
+pub struct SharedBuffer {
+    pub writer_guest_id: usize,
+    pub reader_guest_id: usize,
+    pub region: MemoryRegion,
 }
 
 pub struct Guest {
@@ -42,7 +53,7 @@ pub fn allocate_guest_memory(
     image: &'static [u8],
 ) -> crate::arch::GuestPageTable {
     // Copy guest kernel to a guest memory buffer.
-    let kernel_memory = alloc_pages(image.len());
+    let kernel_memory = alloc_pages(image.len(), 16);
     let dst = kernel_memory;
     let src = image.as_ptr();
     unsafe {
@@ -139,5 +150,44 @@ pub fn initialize_guests() {
                 break;
             }
         }
+    }
+
+    // Allocate and map shared buffers.
+    for buffer_info in SHARED_BUFFERS {
+        // Allocate the buffer.
+        let buffer_memory = alloc_pages(buffer_info.region.size as usize, 4);
+
+        let reader_guest = &GUESTS[buffer_info.reader_guest_id];
+        let writer_guest = &GUESTS[buffer_info.writer_guest_id];
+
+        let buffer_size = buffer_info.region.size;
+
+        let buffer_page_count = buffer_size >> 12;
+
+        // Map buffer to the reader guest.
+        let reader_page_table = reader_guest.page_table.lock();
+        for buffer_page_id in 0..buffer_page_count {
+            let page_offset = buffer_page_id * 4096;
+            reader_page_table.map(
+                buffer_info.region.base_addr + page_offset,
+                buffer_memory as u64 + page_offset,
+                GuestPageTableFunctions::read_flag() as u64,
+            );
+        }
+        drop(reader_page_table);
+
+        // Map buffer to the writer guest.
+        let writer_page_table = writer_guest.page_table.lock();
+        for buffer_page_id in 0..buffer_page_count {
+            let page_offset = buffer_page_id * 4096;
+            writer_page_table.map(
+                buffer_info.region.base_addr + page_offset,
+                buffer_memory as u64 + page_offset,
+                // Allow both read and write because it is impossible to allow only write.
+                GuestPageTableFunctions::write_flag() as u64
+                    | GuestPageTableFunctions::read_flag() as u64,
+            );
+        }
+        drop(writer_page_table);
     }
 }

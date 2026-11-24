@@ -100,7 +100,7 @@ impl HartInterface for HartFunctions {
             // Skip the main hart.
             if hart_id != main_hart_id {
                 // Allocate a stack for a hart.
-                sp = crate::allocator::alloc_pages(stack_size);
+                sp = crate::allocator::alloc_pages(stack_size, 4);
                 let sp_end = (sp as usize) + stack_size;
                 (error_code, value) =
                     sbi_hart_start(hart_id, hart_entry as *const () as usize, sp_end);

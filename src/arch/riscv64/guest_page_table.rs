@@ -23,6 +23,15 @@ impl GuestPageTableInterface for GuestPageTableFunctions {
         );
         table
     }
+    fn read_flag() -> usize {
+        PTE_R as usize
+    }
+    fn write_flag() -> usize {
+        PTE_W as usize
+    }
+    fn execute_flag() -> usize {
+        PTE_X as usize
+    }
 }
 
 #[repr(transparent)]
@@ -50,7 +59,7 @@ pub struct Table(pub [PageEntry; 512]);
 
 impl Table {
     pub fn alloc() -> *mut Table {
-        crate::allocator::alloc_pages(size_of::<Table>()) as *mut Table
+        crate::allocator::alloc_pages(size_of::<Table>(), 16) as *mut Table
     }
 
     pub fn entry_by_addr(&mut self, guest_paddr: u64, level: usize) -> &mut PageEntry {
@@ -69,7 +78,7 @@ pub struct Level3Table(pub [PageEntry; 2048]);
 
 impl Level3Table {
     pub fn alloc() -> *mut Level3Table {
-        crate::allocator::alloc_pages(size_of::<Level3Table>()) as *mut Level3Table
+        crate::allocator::alloc_pages(size_of::<Level3Table>(), 16) as *mut Level3Table
     }
 
     pub fn entry_by_addr(&mut self, guest_paddr: u64) -> &mut PageEntry {
@@ -82,6 +91,7 @@ impl Level3Table {
     }
 }
 
+#[repr(transparent)]
 #[derive(Debug)]
 pub struct GuestPageTable {
     pub table: *mut Level3Table,
@@ -162,11 +172,13 @@ impl GuestPageTable {
         let entry = table.entry_by_addr(guest_paddr, 0);
         if !entry.is_valid() {
             *entry = PageEntry::new(
-                crate::allocator::alloc_pages(size) as u64,
+                crate::allocator::alloc_pages(size, 4) as u64,
                 flags | PTE_V | PTE_U,
             );
         } else {
-            crate::println!("[WARN][GPT]: tried to map already mapped page, GPA: {guest_paddr}");
+            crate::println!(
+                "[WARN][GPT]: tried to map already mapped page, GPA: {guest_paddr}, size: {size}"
+            );
         }
     }
 }
