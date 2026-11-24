@@ -197,7 +197,7 @@ impl crate::arch::VcpuInterface for Vcpu {
     }
     fn initialize_vcpu(
         &'static mut self,
-        page_table: super::guest_page_table::GuestPageTable,
+        page_table: &super::guest_page_table::GuestPageTable,
         guest: &Guest,
         vcpu_ptr_index: usize,
     ) {
@@ -209,13 +209,11 @@ impl crate::arch::VcpuInterface for Vcpu {
         self.guest = guest as *const Guest;
 
         // Initialize aligned MMIO addresses.
-        for region in &guest.aligned_passthrough_mmio_regions {
-            if region.base_addr != 0 {
-                page_table.map(region.base_addr, region.base_addr, PTE_R | PTE_W);
+        for mmio_region in &guest.aligned_passthrough_mmio_regions {
+            if mmio_region.base_addr != 0 {
+                page_table.map(mmio_region.base_addr, mmio_region.base_addr, PTE_R | PTE_W);
             }
         }
-
-        *guest.page_table.lock() = page_table;
 
         // Store this VCPU pointer into the guest's VCPU pointer array (guest.vcpu_ptrs[i]).
         let mut vcpu_ptr = guest.vcpu_ptrs.lock();

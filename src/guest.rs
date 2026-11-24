@@ -40,8 +40,7 @@ unsafe impl Send for Guest {}
 pub fn allocate_guest_memory(
     guest_entry_gpa: usize,
     image: &'static [u8],
-    virtual_hart_id: u64,
-) -> (Vcpu, crate::arch::GuestPageTable) {
+) -> crate::arch::GuestPageTable {
     // Copy guest kernel to a guest memory buffer.
     let kernel_memory = alloc_pages(image.len());
     let dst = kernel_memory;
@@ -50,8 +49,7 @@ pub fn allocate_guest_memory(
         core::ptr::copy_nonoverlapping(src, dst, image.len());
     }
 
-    let table = GuestPageTableFunctions::map_kernel(guest_entry_gpa, kernel_memory);
-    (Vcpu::new(guest_entry_gpa as u64, virtual_hart_id), table)
+    GuestPageTableFunctions::map_kernel(guest_entry_gpa, kernel_memory)
 }
 
 pub fn claim_vcpu_for_hart_if_available(guest_id: usize) -> bool {
@@ -100,6 +98,8 @@ pub fn initialize_guests() {
     for guest in GUESTS.iter() {
         let vcpus: *mut [Option<Vcpu>; MAX_SUPPORTED_HARTS_PER_GUEST] = guest.vcpus.get();
 
+        let page_table = allocate_guest_memory(guest.entry_gpa, guest.data);
+
         for vcpu_id in 0..(guest.info.hart_capacity + guest.info.assigned_hart_capacity) {
             // Get the pointer to the first vCPU in guest.vcpus.
             let base_ptr: *mut Option<Vcpu> = vcpus as *mut Option<Vcpu>;
@@ -109,15 +109,15 @@ pub fn initialize_guests() {
 
             if let Some(vcpu_ref) = unsafe { &mut *cur_vcpu } {
                 // Load the allocated vcpu instead of an empty slot into guest.vcpus[i].
-                let page_table;
-                (*vcpu_ref, page_table) =
-                    allocate_guest_memory(guest.entry_gpa, guest.data, vcpu_id as u64);
+                *vcpu_ref = Vcpu::new(guest.entry_gpa as u64, vcpu_id as u64);
 
-                (*vcpu_ref).initialize_vcpu(page_table, guest, vcpu_id);
+                vcpu_ref.initialize_vcpu(&page_table, guest, vcpu_id);
             } else {
                 unreachable!();
             }
         }
+
+        *guest.page_table.lock() = page_table;
     }
 
     // Initialize assigned hart VCPU pointers before booting the secondary cores.

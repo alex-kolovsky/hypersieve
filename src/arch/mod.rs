@@ -34,7 +34,7 @@ pub trait VcpuInterface {
 
     fn initialize_vcpu(
         &'static mut self,
-        page_table: crate::arch::GuestPageTable,
+        page_table: &crate::arch::GuestPageTable,
         guest: &crate::Guest,
         vcpu_ptr_index: usize,
     );
