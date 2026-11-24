@@ -24,4 +24,8 @@ second_vcpu:
     li a0, 'D'
     ecall
 
+    li t0, 0x4000
+    lw a0, 0(t0)
+    ecall
+
     j second_vcpu

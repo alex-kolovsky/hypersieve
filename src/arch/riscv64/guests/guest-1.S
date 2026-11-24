@@ -27,6 +27,12 @@ first_hart:
     # It tests the save-and-restore logic of the vector extension.
     ecall
 
+    li t0, 0x4000
+    li t1, 'Z'
+    sw t1, 0(t0)
+
+    ecall
+
     j first_hart_loop
 
 second_hart:
