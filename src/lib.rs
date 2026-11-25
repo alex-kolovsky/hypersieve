@@ -4,6 +4,7 @@ pub(crate) mod allocator;
 pub(crate) mod arch;
 pub(crate) mod guest;
 pub(crate) mod handle_trap;
+pub(crate) mod ipc;
 pub(crate) mod multihart;
 pub(crate) mod vcpu_functions;
 pub(crate) mod wasm;

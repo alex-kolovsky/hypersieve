@@ -21,13 +21,6 @@ pub struct MmioMemoryRegion {
     pub emulation_fn: Option<fn(crate::arch::PageFaultInfo)>,
 }
 
-#[derive(Debug)]
-pub struct SharedBuffer {
-    pub writer_guest_id: usize,
-    pub reader_guest_id: usize,
-    pub region: MemoryRegion,
-}
-
 pub struct Guest {
     pub info: GuestInfo,
     pub page_table: spin::Mutex<crate::arch::GuestPageTable>,
