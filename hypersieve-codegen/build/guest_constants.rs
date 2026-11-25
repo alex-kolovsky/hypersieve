@@ -118,6 +118,8 @@ pub fn generate_guest_constants(
     let max_supported_harts_per_guest = hypervisor_configuration.max_supported_harts_per_guest;
     let max_supported_assigned_harts_per_guest =
         hypervisor_configuration.max_supported_assigned_harts_per_guest;
+    let max_allowed_shared_buffer_count_per_guest =
+        hypervisor_configuration.max_allowed_shared_buffer_count_per_guest;
 
     writeln!(
         guest_constants_file,
@@ -130,6 +132,7 @@ use hypersieve_abi::{{MAX_SUPPORTED_HARTS_PER_GUEST, GuestInfo}};
 
 pub const MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT: usize = {max_aligned_passthrough_mmio_regions_count};
 pub const MAX_ALLOWED_MMIO_REGIONS_COUNT: usize = {max_allowed_mmio_peripherals_count};
+pub const MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST: usize = {max_allowed_shared_buffer_count_per_guest};
 
 pub const SYSTEM_MMIO_WINDOWS: [MmioMemoryRegion; {}] = {:#?};
 
@@ -157,35 +160,41 @@ pub static GUESTS: [Guest; {}] = [
         );
 
         // Ensure that buffers allowed to guest don't overlap.
-        if let Some(ref allowed_to_write_shared_buffers_vec) = guest.allowed_to_write_shared_buffers
-        {
-            let mut all_allowed_shared_buffers_vec = Vec::new();
-            all_allowed_shared_buffers_vec.extend(allowed_to_write_shared_buffers_vec);
+        let allowed_to_write_shared_buffers_vec = guest
+            .allowed_to_write_shared_buffers
+            .clone()
+            .unwrap_or_default();
+        let allowed_to_read_shared_buffers_vec = guest
+            .allowed_to_read_shared_buffers
+            .clone()
+            .unwrap_or_default();
 
-            if let Some(ref allowed_to_read_shared_buffers_vec) =
-                guest.allowed_to_read_shared_buffers
-            {
-                all_allowed_shared_buffers_vec.extend(allowed_to_read_shared_buffers_vec);
-            }
+        let mut allowed_shared_buffers_vec = Vec::new();
+        allowed_shared_buffers_vec.extend(allowed_to_read_shared_buffers_vec);
+        allowed_shared_buffers_vec.extend(allowed_to_write_shared_buffers_vec);
+        allowed_shared_buffers_vec.sort();
 
-            all_allowed_shared_buffers_vec.sort();
+        // Buffer cannot allow the same guest for both reading and writing purposes.
+        let unique: std::collections::HashSet<_> = allowed_shared_buffers_vec.iter().collect();
+        assert_eq!(
+            unique.len(),
+            allowed_shared_buffers_vec.len(),
+            "[FATAL][CONFIG]: buffer cannot be allowed for guests for both reading and writing"
+        );
 
-            let unique: std::collections::HashSet<_> =
-                all_allowed_shared_buffers_vec.iter().collect();
+        // Check if allowed to the guest shared buffer regions overlaps.
+        detect_buffer_overlaps(
+            &hypervisor_configuration.shared_buffers,
+            &allowed_shared_buffers_vec,
+        );
 
-            // Buffer cannot allow the same guest for both reading and writing purposes.
-            assert_eq!(
-                unique.len(),
-                all_allowed_shared_buffers_vec.len(),
-                "[FATAL][CONFIG]: buffer cannot be allowed for guests for both reading and writing"
-            );
+        let mut allowed_shared_buffers: Vec<Option<u32>> = allowed_shared_buffers_vec
+            .iter()
+            .clone()
+            .map(|buffer_id| Some(*buffer_id))
+            .collect();
 
-            // Check if allowed to the guest shared buffer regions overlaps.
-            detect_buffer_overlaps(
-                &hypervisor_configuration.shared_buffers,
-                &all_allowed_shared_buffers_vec,
-            );
-        }
+        allowed_shared_buffers.resize(max_allowed_shared_buffer_count_per_guest, None);
 
         // Create guest.vcpus array.
         let mut vcpus: String = String::from("[");
@@ -202,21 +211,16 @@ pub static GUESTS: [Guest; {}] = [
         vcpus.push(']');
 
         // Extend 'assigned_harts' with default values up to MAX_SUPPORTED_ASSIGNED_HARTS_PER_GUEST.
-        guest.assigned_harts.extend(vec![
-            None;
-            max_supported_assigned_harts_per_guest
-                - guest.assigned_harts.len()
-        ]);
+        guest
+            .assigned_harts
+            .resize(max_supported_assigned_harts_per_guest, None);
 
         // Extend 'aligned_passthrough_mmio_regions' with default
         // values up to MAX_ALIGNED_PASSTHROUGH_MMIO_REGIONS_COUNT.
-        guest.aligned_passthrough_mmio_regions.extend(vec![
-            MemoryRegion::empty();
-            max_aligned_passthrough_mmio_regions_count
-                - guest
-                    .aligned_passthrough_mmio_regions
-                    .len()
-        ]);
+        guest.aligned_passthrough_mmio_regions.resize(
+            max_aligned_passthrough_mmio_regions_count,
+            MemoryRegion::empty(),
+        );
 
         // Left-pad 'allowed_mmio_regions' with defaults up to MAX_ALLOWED_MMIO_REGIONS.
         let mut allowed_mmio_regions = vec![
@@ -260,6 +264,7 @@ pub static GUESTS: [Guest; {}] = [
     guest_specific_trap_routine: crate::guest_{guest_id}_trap_routine,
     guest_specific_ret_routine: crate::guest_{guest_id}_ret_routine,
     guest_specific_switch_routine: crate::guest_{guest_id}_switch_routine,
+    shared_buffer_ids: {allowed_shared_buffers:#?},
 }},
 
 ",

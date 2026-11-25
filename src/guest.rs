@@ -2,7 +2,7 @@ use hypersieve_abi::GuestInfo;
 
 use crate::{
     GUESTS, MAX_ALIGNED_PASSTHROUGH_REGIONS_COUNT, MAX_ALLOWED_MMIO_REGIONS_COUNT,
-    MAX_SUPPORTED_HARTS_PER_GUEST, SHARED_BUFFERS,
+    MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST, SHARED_BUFFERS,
     allocator::alloc_pages,
     arch::{GuestPageTableFunctions, GuestPageTableInterface, Vcpu, VcpuInterface},
 };
@@ -34,6 +34,7 @@ pub struct Guest {
     pub guest_specific_trap_routine: fn(&mut Vcpu),
     pub guest_specific_ret_routine: fn(&mut Vcpu),
     pub guest_specific_switch_routine: fn(&mut Vcpu),
+    pub shared_buffer_ids: [Option<usize>; MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST],
 }
 
 // The Guest struct is thread-safe if we never change Option::None

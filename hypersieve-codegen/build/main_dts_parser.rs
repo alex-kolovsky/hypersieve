@@ -20,6 +20,7 @@ pub struct HypervisorConfiguration {
     pub max_supported_assigned_harts_per_guest: usize,
     pub max_allowed_mmio_peripherals_count: usize,
     pub max_aligned_passthrough_mmio_regions_count: usize,
+    pub max_allowed_shared_buffer_count_per_guest: usize,
 
     pub target_arch_features: TargetArchFeatures,
 
@@ -104,6 +105,7 @@ pub fn parse_dts(
 
     let mut max_allowed_mmio_peripherals_count: usize = 0;
     let mut max_aligned_passthrough_mmio_regions_count: usize = 0;
+    let mut max_allowed_shared_buffer_count_per_guest: usize = 0;
 
     // Total hart capacity allocated across all guest VMs.
     let mut total_hart_capacity: usize = 0;
@@ -210,6 +212,7 @@ pub fn parse_dts(
                 }
             }
 
+            let mut allowed_shared_buffer_count = 0;
             let allowed_to_write_shared_buffers: Option<Vec<u32>>;
             if let Some(allowed_to_write_shared_buffers_raw) =
                 guest.property("allowed-to-write-shared-buffers")
@@ -238,6 +241,7 @@ pub fn parse_dts(
                     allowed_to_write_shared_buffers_vec
                         .push(allowed_to_write_shared_buffer_region_id);
                 }
+                allowed_shared_buffer_count += allowed_to_write_shared_buffers_vec.len();
                 allowed_to_write_shared_buffers = Some(allowed_to_write_shared_buffers_vec);
             } else {
                 allowed_to_write_shared_buffers = None;
@@ -271,9 +275,14 @@ pub fn parse_dts(
                         .push(allowed_to_read_shared_buffer_region_id);
                 }
 
+                allowed_shared_buffer_count += allowed_to_read_shared_buffers_vec.len();
                 allowed_to_read_shared_buffers = Some(allowed_to_read_shared_buffers_vec);
             } else {
                 allowed_to_read_shared_buffers = None;
+            }
+
+            if allowed_shared_buffer_count >= max_allowed_shared_buffer_count_per_guest {
+                max_allowed_shared_buffer_count_per_guest = allowed_shared_buffer_count;
             }
 
             let path = format!(
@@ -396,6 +405,7 @@ pub fn parse_dts(
         max_supported_assigned_harts_per_guest,
         max_allowed_mmio_peripherals_count,
         max_aligned_passthrough_mmio_regions_count,
+        max_allowed_shared_buffer_count_per_guest,
         harts,
         total_hart_capacity,
         target_arch_features,
