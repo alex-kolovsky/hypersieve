@@ -106,7 +106,7 @@ macro_rules! codegen_out_dir {{
     let memory_peripherals = build_modules::hardware_dts_parser::parse_dts(out_dir.as_str());
 
     // Compile and parse the main device tree file.
-    let mut hypervisor_configuration = build_modules::main_dts_parser::parse_dts(
+    let mut hypervisor_configuration = build_modules::config_dts_parser::parse_dts(
         out_dir.as_str(),
         &target_arch,
         memory_peripherals,

@@ -1,4 +1,4 @@
-use crate::build_modules::main_dts_parser::HypervisorConfiguration;
+use crate::build_modules::config_dts_parser::HypervisorConfiguration;
 use std::io::Write;
 
 pub fn generate_guest_abi_constants(

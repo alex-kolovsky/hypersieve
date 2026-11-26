@@ -61,7 +61,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
     let dtb_output_path = std::path::PathBuf::from(out_dir).join("hardware.dtb");
 
     // Compile Device Tree file.
-    crate::build_modules::main_dts_parser::compile_dts(&dtb_output_path, "../hardware.dts");
+    crate::build_modules::config_dts_parser::compile_dts(&dtb_output_path, "../hardware.dts");
 
     // Parse Device Tree Binary file.
     let dtb_data = std::fs::read(dtb_output_path)
@@ -98,11 +98,10 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
             // Extract addresses of peripheral (reg).
             let mut regions: Vec<MmioPeripheral> = Vec::new();
 
-            let reg = peripheral
+            let reg_raw = peripheral
                 .property("reg")
-                .expect("[FATAL][CONFIG]no reg field in the hardware DTS");
-            // Convert a raw `reg` DTB property into native array.
-            let reg_raw = reg.value;
+                .expect("[FATAL][CONFIG]no reg field in the hardware DTS")
+                .value;
 
             if reg_raw.len() % 8 != 0 {
                 panic!("[FATAL][CONFIG]: MMIO reg cell is not a multiple of 8 bytes");
@@ -110,6 +109,7 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
 
             let (chunks, _remainder) = reg_raw.as_chunks::<8>();
 
+            // Convert a raw `reg` DTB property into native array.
             for bytes in chunks.chunks(2) {
                 let base_addr: u64 = u64::from_be_bytes(bytes[0]);
                 let size: u64 = u64::from_be_bytes(bytes[1]);

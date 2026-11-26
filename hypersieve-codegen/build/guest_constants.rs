@@ -1,8 +1,8 @@
 use crate::{
     Guest, NotifyPolicy, TargetArch,
     build_modules::{
+        config_dts_parser::{HypervisorConfiguration, SharedBuffer},
         hardware_dts_parser::{MemoryRegion, MmioPeripheral},
-        main_dts_parser::{HypervisorConfiguration, SharedBuffer},
     },
 };
 use std::io::Write;
