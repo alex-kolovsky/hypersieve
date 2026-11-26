@@ -80,14 +80,12 @@ pub fn parse_dts(out_dir: &str) -> Vec<MmioPeripheral> {
                 .as_str()
                 .expect("[FATAL][CONFIG]: failed to parse memory policy field into string");
 
-            let policy = if memory_policy_str == "emulate" {
-                MmioPolicy::Emulate
-            } else if memory_policy_str == "passthrough" {
-                MmioPolicy::Passthrough
-            } else {
-                panic!(
+            let policy = match memory_policy_str {
+                "emulate" => MmioPolicy::Emulate,
+                "passthrough" => MmioPolicy::Passthrough,
+                _ => panic!(
                     "[FATAL][CONFIG]: unsupported memory policy: {memory_policy_str}, allowed are: \"passthrough\"/\"emulate\""
-                );
+                ),
             };
 
             let compatible: String = peripheral

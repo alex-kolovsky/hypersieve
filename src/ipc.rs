@@ -9,13 +9,22 @@ pub struct SharedBuffer {
 
 #[repr(C)]
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum SharedBufferPolicies {
-    Write = 0,
-    Read = 1,
+pub enum SharedBufferPolicy {
+    Write,
+    Read(NotifyPolicy),
+}
+
+impl SharedBufferPolicy {
+    fn policy_bit(&self) -> usize {
+        match self {
+            SharedBufferPolicy::Read(_) => 0,
+            SharedBufferPolicy::Write => 1,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum SharedBufferNotifyType {
+pub enum NotifyPolicy {
     Poll = 0,
     Synchronous = 1,
 }
@@ -23,6 +32,6 @@ pub enum SharedBufferNotifyType {
 #[derive(Debug)]
 pub struct SharedBufferInfo {
     pub global_id: usize,
-    pub policy: SharedBufferPolicies,
+    pub policy: SharedBufferPolicy,
     pub region: MemoryRegion,
 }

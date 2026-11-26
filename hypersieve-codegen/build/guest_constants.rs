@@ -1,5 +1,5 @@
 use crate::{
-    Guest, TargetArch,
+    Guest, NotifyPolicy, TargetArch,
     build_modules::{
         hardware_dts_parser::{MemoryRegion, MmioPeripheral},
         main_dts_parser::{HypervisorConfiguration, SharedBuffer},
@@ -128,7 +128,7 @@ use crate::guest::MemoryRegion;
 use crate::guest::MmioMemoryRegion;
 use crate::ipc::SharedBufferInfo;
 use crate::ipc::SharedBuffer;
-use crate::ipc::SharedBufferPolicies;
+use crate::ipc::SharedBufferPolicy;
 use crate::arch::Vcpu;
 use hypersieve_abi::{{MAX_SUPPORTED_HARTS_PER_GUEST, GuestInfo}};
 
@@ -219,6 +219,7 @@ pub static GUESTS: [Guest; {}] = [
 
         let allowed_shared_buffer_infos = generate_allowed_buffers_string(
             &hypervisor_configuration.shared_buffers,
+            &guest.notify_policy,
             hypervisor_configuration.max_allowed_shared_buffer_count_per_guest,
             allowed_to_write_shared_buffers_vec,
             allowed_to_read_shared_buffers_vec,
@@ -292,7 +293,8 @@ fn detect_buffer_overlaps(buffers: &[SharedBuffer], ids: &[u32]) {
 }
 
 fn generate_allowed_buffers_string(
-    shared_buffers: &Vec<SharedBuffer>,
+    shared_buffers: &[SharedBuffer],
+    notify_policy_opt: &Option<NotifyPolicy>,
     max_allowed_shared_buffer_count_per_guest: usize,
     allowed_to_write_shared_buffers_vec: Vec<u32>,
     allowed_to_read_shared_buffers_vec: Vec<u32>,
@@ -305,7 +307,7 @@ fn generate_allowed_buffers_string(
 Some(SharedBufferInfo {{
     global_id: {buffer_id},
     region: {buffer_region:#?},
-    policy: SharedBufferPolicies::Write,
+    policy: SharedBufferPolicy::Write,
 }}),
                 "
         );
@@ -313,13 +315,16 @@ Some(SharedBufferInfo {{
         allowed_shared_buffer_infos.push_str(buffer_info.as_str());
     }
     for buffer_id in &allowed_to_read_shared_buffers_vec {
+        let notify_policy = notify_policy_opt
+            .as_ref()
+            .expect("[FATAL][CONFIG]: notify-policy field is not set");
         let buffer_region = shared_buffers[*buffer_id as usize].region;
         let buffer_info = format!(
             "
 Some(SharedBufferInfo {{
     global_id: {buffer_id},
     region: {buffer_region:#?},
-    policy: SharedBufferPolicies::Read,
+    policy: SharedBufferPolicy::Read(crate::ipc::NotifyPolicy::{notify_policy:#?}),
 }}),
                 "
         );

@@ -52,6 +52,13 @@
             allowed-to-write-shared-buffers = <0>;
             allowed-to-read-shared-buffers = <1>;
 
+            // Type of notification that must be used when writing in shared buffers.
+            // Mandatory field if the guest has allowed to read shared buffers.
+            // Possible values:
+            // - 'synchronous': Writer must call a specified ecall after writing to notify reader.
+            // - 'poll': Reader will poll for new data.
+            notify-policy = "synchronous";
+
             // Virtual address of the guest entry.
             entry = <0x0 0x0>;
         };
@@ -66,6 +73,8 @@
             allowed-to-write-shared-buffers = <1>;
 
             path = "target/guest-2/guest-2.bin";
+
+            notify-policy = "poll";
 
             hart-capacity = <2>;
             allowed-mmio = <0x0 0x10000000 0x0 0x1>;

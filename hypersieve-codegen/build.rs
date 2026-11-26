@@ -37,6 +37,13 @@ struct Guest {
     target_arch_guest_features: TargetArchGuestFeatures,
     allowed_to_write_shared_buffers: Option<Vec<u32>>,
     allowed_to_read_shared_buffers: Option<Vec<u32>>,
+    notify_policy: Option<NotifyPolicy>,
+}
+
+#[derive(Debug)]
+pub enum NotifyPolicy {
+    Synchronous,
+    Poll,
 }
 
 #[derive(Debug, Default)]

@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use crate::CONFIG_DTS_PATH;
 use crate::Guest;
 use crate::Hart;
+use crate::NotifyPolicy;
 use crate::TargetArch;
 use crate::build_modules::arch::TargetArchFeatures;
 use crate::build_modules::arch::TargetArchGuestFeatures;
@@ -166,7 +167,7 @@ pub fn parse_dts(
                 .property("hart-capacity")
                 .expect("[FATAL][CONFIG]: no hart-capacity field in DTS")
                 .as_usize()
-                .expect("[FATAL][CONFIG]: failed to parse memory policy field into usize");
+                .expect("[FATAL][CONFIG]: failed to parse hart-capacity field into usize");
 
             let allowed_mmio_raw = guest
                 .property("allowed-mmio")
@@ -247,6 +248,8 @@ pub fn parse_dts(
                 allowed_to_write_shared_buffers = None;
             }
             let allowed_to_read_shared_buffers: Option<Vec<u32>>;
+
+            let mut notify_policy: Option<NotifyPolicy> = None;
             if let Some(allowed_to_read_shared_buffers_raw) =
                 guest.property("allowed-to-read-shared-buffers")
             {
@@ -277,6 +280,20 @@ pub fn parse_dts(
 
                 allowed_shared_buffer_count += allowed_to_read_shared_buffers_vec.len();
                 allowed_to_read_shared_buffers = Some(allowed_to_read_shared_buffers_vec);
+
+                let notify_policy_str = guest
+                    .property("notify-policy")
+                    .expect("[FATAL][CONFIG]: no notify-policy field in DTS")
+                    .as_str()
+                    .expect("[FATAL][CONFIG]: failed to parse notify-policy field into string");
+
+                notify_policy = Some(match notify_policy_str {
+                    "poll" => NotifyPolicy::Poll,
+                    "synchronous" => NotifyPolicy::Synchronous,
+                    _ => panic!(
+                        "[FATAL][CONFIG]: unsupported memory policy: {notify_policy_str}, allowed are: \"passthrough\"/\"emulate\""
+                    ),
+                });
             } else {
                 allowed_to_read_shared_buffers = None;
             }
@@ -292,7 +309,7 @@ pub fn parse_dts(
                     .property("path")
                     .expect("[FATAL][CONFIG]: no path field in DTS")
                     .as_str()
-                    .expect("[FATAL][CONFIG]: failed to parse memory policy field into string")
+                    .expect("[FATAL][CONFIG]: failed to parse path field into string")
             );
 
             if !target_arch.is_wasm32() && !std::path::Path::exists(std::path::Path::new(&path)) {
@@ -361,6 +378,7 @@ pub fn parse_dts(
                     allowed_to_write_shared_buffers,
                     allowed_to_read_shared_buffers,
                     target_arch_guest_features,
+                    notify_policy,
                 };
 
                 guests.push(guest_entry);
@@ -375,6 +393,7 @@ pub fn parse_dts(
                     aligned_passthrough_mmio_regions,
                     allowed_mmio_peripherals,
                     target_arch_guest_features,
+                    notify_policy,
                 };
                 guests.push(guest_entry);
             }
