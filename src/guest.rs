@@ -5,7 +5,7 @@ use crate::{
     MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST, MAX_SUPPORTED_HARTS_PER_GUEST, SHARED_BUFFERS,
     allocator::alloc_pages,
     arch::{GuestPageTableFunctions, GuestPageTableInterface, Vcpu, VcpuInterface},
-    ipc::SharedBufferInfo,
+    ipc::{GuestType, SharedBufferInfo},
 };
 use core::{cell::UnsafeCell, sync::atomic::Ordering};
 
@@ -35,6 +35,10 @@ pub struct Guest {
     pub guest_specific_trap_routine: fn(&mut Vcpu),
     pub guest_specific_ret_routine: fn(&mut Vcpu),
     pub guest_specific_switch_routine: fn(&mut Vcpu),
+    pub shared_buffer_infos: [Option<SharedBufferInfo>; MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST],
+}
+
+pub struct WasmGuest {
     pub shared_buffer_infos: [Option<SharedBufferInfo>; MAX_ALLOWED_SHARED_BUFFER_COUNT_PER_GUEST],
 }
 
@@ -148,41 +152,46 @@ pub fn initialize_guests() {
     }
 
     // Allocate and map shared buffers.
-    for buffer_info in SHARED_BUFFERS {
+    for buffer in SHARED_BUFFERS {
         // Allocate the buffer.
-        let buffer_memory = alloc_pages(buffer_info.region.size as usize, 4);
+        let buffer_memory = alloc_pages(buffer.region.size as usize, 4);
 
-        let reader_guest = &GUESTS[buffer_info.reader_guest_id];
-        let writer_guest = &GUESTS[buffer_info.writer_guest_id];
-
-        let buffer_size = buffer_info.region.size;
+        let buffer_size = buffer.region.size;
 
         let buffer_page_count = buffer_size >> 12;
 
-        // Map buffer to the reader guest.
-        let reader_page_table = reader_guest.page_table.lock();
-        for buffer_page_id in 0..buffer_page_count {
-            let page_offset = buffer_page_id * 4096;
-            reader_page_table.map(
-                buffer_info.region.base_addr + page_offset,
-                buffer_memory as u64 + page_offset,
-                GuestPageTableFunctions::read_flag() as u64,
-            );
-        }
-        drop(reader_page_table);
+        if buffer.reader_guest_type == GuestType::Native {
+            let reader_guest = &GUESTS[buffer.reader_guest_id];
 
-        // Map buffer to the writer guest.
-        let writer_page_table = writer_guest.page_table.lock();
-        for buffer_page_id in 0..buffer_page_count {
-            let page_offset = buffer_page_id * 4096;
-            writer_page_table.map(
-                buffer_info.region.base_addr + page_offset,
-                buffer_memory as u64 + page_offset,
-                // Allow both read and write because it is impossible to allow only write.
-                GuestPageTableFunctions::write_flag() as u64
-                    | GuestPageTableFunctions::read_flag() as u64,
-            );
+            // Map buffer to the reader guest.
+            let reader_page_table = reader_guest.page_table.lock();
+            for buffer_page_id in 0..buffer_page_count {
+                let page_offset = buffer_page_id * 4096;
+                reader_page_table.map(
+                    buffer.region.base_addr + page_offset,
+                    buffer_memory as u64 + page_offset,
+                    GuestPageTableFunctions::read_flag() as u64,
+                );
+            }
+            drop(reader_page_table);
         }
-        drop(writer_page_table);
+
+        if buffer.writer_guest_type == GuestType::Native {
+            let writer_guest = &GUESTS[buffer.writer_guest_id];
+
+            // Map buffer to the writer guest.
+            let writer_page_table = writer_guest.page_table.lock();
+            for buffer_page_id in 0..buffer_page_count {
+                let page_offset = buffer_page_id * 4096;
+                writer_page_table.map(
+                    buffer.region.base_addr + page_offset,
+                    buffer_memory as u64 + page_offset,
+                    // Allow both read and write because it is impossible to allow only write.
+                    GuestPageTableFunctions::write_flag() as u64
+                        | GuestPageTableFunctions::read_flag() as u64,
+                );
+            }
+            drop(writer_page_table);
+        }
     }
 }

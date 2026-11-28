@@ -69,8 +69,8 @@
             // comment out or delete this parameter to disable it.
             floating-point-extension;
 
-            allowed-to-read-shared-buffers = <0>;
             allowed-to-write-shared-buffers = <1>;
+            allowed-to-read-shared-buffers = <0>;
 
             path = "target/guest-2/guest-2.bin";
 

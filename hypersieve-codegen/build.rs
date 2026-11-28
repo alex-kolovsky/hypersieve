@@ -37,7 +37,13 @@ struct Guest {
     target_arch_guest_features: TargetArchGuestFeatures,
     allowed_to_write_shared_buffers: Option<Vec<u32>>,
     allowed_to_read_shared_buffers: Option<Vec<u32>>,
-    notify_policy: Option<NotifyPolicy>,
+}
+
+#[derive(Debug)]
+struct WasmGuest {
+    path: String,
+    allowed_to_read_shared_buffers: Option<Vec<u32>>,
+    allowed_to_write_shared_buffers: Option<Vec<u32>>,
 }
 
 #[derive(Debug)]
@@ -142,6 +148,10 @@ macro_rules! codegen_out_dir {{
             &mut hypervisor_configuration,
             &target_arch,
             drivers_config,
+        );
+        build_modules::wasm_guest_constants::generate_wasm_guest_constants(
+            &out_dir,
+            &hypervisor_configuration,
         );
 
         // Generate hart constants file.

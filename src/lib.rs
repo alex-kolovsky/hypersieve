@@ -13,6 +13,7 @@ extern crate alloc;
 
 // Include files created by the build script.
 include!(concat!(codegen_out_dir!(), "/guest_constants.rs"));
+include!(concat!(codegen_out_dir!(), "/wasm_guest_constants.rs"));
 include!(concat!(codegen_out_dir!(), "/hart_constants.rs"));
 include!(concat!(codegen_out_dir!(), "/guest_specific_routines.rs"));
 include!(concat!(codegen_out_dir!(), "/module_mappings.rs"));

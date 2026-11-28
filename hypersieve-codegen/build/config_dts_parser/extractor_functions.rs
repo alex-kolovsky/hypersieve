@@ -3,8 +3,11 @@ use std::cmp::Ordering;
 use fdt::node::FdtNode;
 
 use crate::{
-    Hart, NotifyPolicy,
-    build_modules::{config_dts_parser::SharedBuffer, hardware_dts_parser::MemoryRegion},
+    Hart,
+    build_modules::{
+        config_dts_parser::{GuestType, SharedBuffer},
+        hardware_dts_parser::MemoryRegion,
+    },
 };
 
 pub fn extract_assigned_harts(
@@ -54,6 +57,7 @@ pub fn extract_assigned_harts(
 pub fn extract_allowed_to_write_shared_buffers(
     guest: FdtNode,
     guest_id: usize,
+    guest_type: GuestType,
     shared_buffers: &mut [SharedBuffer],
 ) -> (Option<Vec<u32>>, usize) {
     let mut allowed_to_write_shared_buffer_count: usize = 0;
@@ -78,6 +82,8 @@ pub fn extract_allowed_to_write_shared_buffers(
 
             shared_buffers[allowed_to_write_shared_buffer_region_id as usize].writer_guest_id =
                 Some(guest_id);
+            shared_buffers[allowed_to_write_shared_buffer_region_id as usize].writer_guest_type =
+                Some(guest_type);
 
             allowed_to_write_shared_buffers_vec.push(allowed_to_write_shared_buffer_region_id);
         }
@@ -94,9 +100,9 @@ pub fn extract_allowed_to_write_shared_buffers(
 pub fn extract_allowed_to_read_shared_buffers(
     guest: FdtNode,
     guest_id: usize,
+    guest_type: GuestType,
     shared_buffers: &mut [SharedBuffer],
-) -> (Option<Vec<u32>>, usize, Option<NotifyPolicy>) {
-    let mut notify_policy: Option<NotifyPolicy> = None;
+) -> (Option<Vec<u32>>, usize) {
     let mut allowed_to_read_shared_buffer_count: usize = 0;
     let mut allowed_to_read_shared_buffers = None;
     if let Some(allowed_to_read_shared_buffers_raw) =
@@ -120,30 +126,18 @@ pub fn extract_allowed_to_read_shared_buffers(
             shared_buffers[allowed_to_read_shared_buffer_region_id as usize].reader_guest_id =
                 Some(guest_id);
 
+            shared_buffers[allowed_to_read_shared_buffer_region_id as usize].reader_guest_type =
+                Some(guest_type);
+
             allowed_to_read_shared_buffers_vec.push(allowed_to_read_shared_buffer_region_id);
         }
 
         allowed_to_read_shared_buffer_count = allowed_to_read_shared_buffers_vec.len();
         allowed_to_read_shared_buffers = Some(allowed_to_read_shared_buffers_vec);
-
-        let notify_policy_str = guest
-            .property("notify-policy")
-            .expect("[FATAL][CONFIG]: no notify-policy field in DTS")
-            .as_str()
-            .expect("[FATAL][CONFIG]: failed to parse notify-policy field into string");
-
-        notify_policy = Some(match notify_policy_str {
-            "poll" => NotifyPolicy::Poll,
-            "synchronous" => NotifyPolicy::Synchronous,
-            _ => panic!(
-                "[FATAL][CONFIG]: unsupported memory policy: {notify_policy_str}, allowed are: \"passthrough\"/\"emulate\""
-            ),
-        });
     }
     (
         allowed_to_read_shared_buffers,
         allowed_to_read_shared_buffer_count,
-        notify_policy,
     )
 }
 
